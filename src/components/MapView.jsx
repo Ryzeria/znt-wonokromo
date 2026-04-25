@@ -1,17 +1,16 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
-import { MapContainer, TileLayer, GeoJSON, ScaleControl, useMap, useMapEvents } from 'react-leaflet'
+import { useEffect, useRef, useState, useMemo } from 'react'
+import { MapContainer, TileLayer, GeoJSON, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
+import * as turf from '@turf/turf'
+import { BASE, BASEMAPS, LAYERS, BUFFER_DISTANCES } from '../config'
 import {
-  BASE, BASEMAPS, LAYERS, BUFFER_DISTANCES,
-  MAP_CENTER, MAP_ZOOM
-} from '../config'
-import {
-  getDesaColor, getZntStyle, getLulcColor, getBufferStyle,
+  getZntStyle, getDesaColor, getLulcColor, getBufferStyle, getDatasetColor,
   computeBuffer, filterKolektor,
   popupZNT, popupDesa, popupDataset, popupGeneric,
   injectPopupStyles, formatDistance, formatArea
 } from '../utils'
 
+/* Fix default Leaflet marker icons */
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -19,61 +18,37 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 })
 
-/* ─── MapController: expose map instance ──────── */
-function MapController({ onReady, onMouseMove, measureMode, measurePoints, onMapClick, onMapDblClick }) {
+/* ─── MapController ─────────────────────────────────── */
+function MapController({ onReady, onMouseMove }) {
   const map = useMap()
-  useEffect(() => { onReady(map); injectPopupStyles() }, [map])
+  useEffect(() => { injectPopupStyles(); onReady(map) }, [map])
+  useMapEvents({ mousemove: (e) => onMouseMove(e.latlng) })
+  return null
+}
 
-  useMapEvents({
-    mousemove: (e) => onMouseMove(e.latlng),
-    click: (e) => { if (measureMode) onMapClick(e.latlng) },
-    dblclick: (e) => { if (measureMode) { e.originalEvent.preventDefault(); onMapDblClick() } }
+/* ─── Dot icon factory ───────────────────────────────── */
+function dotIcon(color, size = 12) {
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    className: '', iconAnchor: [size / 2, size / 2]
   })
-  return null
 }
 
-/* ─── Measure overlay ─────────────────────────── */
-function MeasureOverlay({ map, mode, points, onFinish }) {
-  const layerRef = useRef(null)
-  const tooltipRef = useRef(null)
-
-  useEffect(() => {
-    if (!map) return
-    if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null }
-    if (!points.length) return
-
-    const latlngs = points.map(p => [p.lat, p.lng])
-
-    if (mode === 'distance') {
-      layerRef.current = L.polyline(latlngs, { color: '#f59e0b', weight: 3, dashArray: '6 4' }).addTo(map)
-      points.forEach((p, i) =>
-        L.circleMarker([p.lat, p.lng], { radius: 5, color: '#f59e0b', fillColor: '#fff', fillOpacity: 1, weight: 2 }).addTo(map)
-          .bindTooltip(i === 0 ? 'Start' : `P${i}`, { permanent: true, className: 'text-xs', offset: [0, -8] })
-      )
-    } else if (mode === 'area' && latlngs.length >= 3) {
-      layerRef.current = L.polygon(latlngs, { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.2 }).addTo(map)
-    } else if (mode === 'area') {
-      layerRef.current = L.polyline(latlngs, { color: '#10b981', weight: 2 }).addTo(map)
-    }
-
-    return () => { if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null } }
-  }, [map, mode, points])
-
-  return null
-}
-
-/* ─── Main MapView ────────────────────────────── */
+/* ─── Main MapView ──────────────────────────────────── */
 export default function MapView({
-  theme, language, t, activeBasemap, visibleLayers, activeBuffers,
-  measureMode, onMapReady, onCoordsChange, onMeasureResult
+  t, activeBasemap, visibleLayers, activeBuffers,
+  measureMode, clearCount,
+  onMapReady, onCoordsChange, onMeasureResult
 }) {
   const [geoData, setGeoData] = useState({})
   const [bufferCache, setBufferCache] = useState({})
-  const [measurePoints, setMeasurePoints] = useState([])
   const mapRef = useRef(null)
-  const measureLayersRef = useRef([])
+  const measureGroupRef = useRef(null)
+  const measurePtsRef   = useRef([])
+  const locateGroupRef  = useRef(null)
+  const computedRef     = useRef(new Set())  // avoid duplicate buffer computation
 
-  /* Load all GeoJSON files on mount */
+  /* ── Load GeoJSON ── */
   useEffect(() => {
     LAYERS.forEach(layer => {
       fetch(`${BASE}GeoJSON/${layer.file}`)
@@ -83,232 +58,228 @@ export default function MapView({
     })
   }, [])
 
-  /* Compute buffers lazily when needed */
+  /* ── Compute buffers (lazy, one-shot per key) ── */
   useEffect(() => {
-    const bufferLayers = LAYERS.filter(l => l.buffer)
-    bufferLayers.forEach(layer => {
+    LAYERS.filter(l => l.buffer).forEach(layer => {
       if (!geoData[layer.id]) return
       BUFFER_DISTANCES.forEach(dist => {
         const key = `${layer.id}_${dist}`
-        if (bufferCache[key]) return
+        if (computedRef.current.has(key)) return
+        computedRef.current.add(key)
         const raw = layer.id === 'jalan' ? filterKolektor(geoData[layer.id]) : geoData[layer.id]
         const buf = computeBuffer(raw, dist)
         if (buf) setBufferCache(prev => ({ ...prev, [key]: buf }))
       })
     })
-  }, [geoData, Object.keys(bufferCache).length])
+  }, [geoData])
 
-  /* Clear measure layers */
-  const clearMeasureLayers = useCallback(() => {
-    if (!mapRef.current) return
-    measureLayersRef.current.forEach(l => mapRef.current.removeLayer(l))
-    measureLayersRef.current = []
-    setMeasurePoints([])
-  }, [])
-
-  /* Handle measureMode change */
+  /* ── Init measure + locate layer groups ── */
   useEffect(() => {
-    if (!mapRef.current) return
-    const container = mapRef.current.getContainer()
-    if (measureMode) {
-      container.classList.add('measuring')
-    } else {
+    const map = mapRef.current
+    if (!map) return
+    measureGroupRef.current = L.layerGroup().addTo(map)
+    locateGroupRef.current  = L.layerGroup().addTo(map)
+    return () => {
+      measureGroupRef.current?.remove()
+      locateGroupRef.current?.remove()
+    }
+  }, [mapRef.current])
+
+  /* ── Clear measure layers ── */
+  useEffect(() => {
+    if (!measureGroupRef.current) return
+    measureGroupRef.current.clearLayers()
+    measurePtsRef.current = []
+  }, [clearCount])
+
+  /* ── Measure tool: bind / unbind on mode change ── */
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const container = map.getContainer()
+
+    if (!measureMode) {
       container.classList.remove('measuring')
-      clearMeasureLayers()
+      return
     }
-  }, [measureMode, clearMeasureLayers])
+    container.classList.add('measuring')
 
-  /* Measure click */
-  const handleMapClick = useCallback((latlng) => {
-    if (!measureMode) return
-    const newPoints = [...measurePoints, latlng]
-    setMeasurePoints(newPoints)
+    const onMapClick = (e) => {
+      const pt = e.latlng
+      measurePtsRef.current = [...measurePtsRef.current, pt]
+      const pts = measurePtsRef.current
 
-    if (measureMode === 'distance' && newPoints.length >= 2) {
-      let total = 0
-      for (let i = 1; i < newPoints.length; i++) {
-        total += L.latLng(newPoints[i - 1]).distanceTo(L.latLng(newPoints[i]))
+      /* draw point */
+      L.circleMarker(pt, { radius: 5, color: '#f59e0b', fillColor: '#fff', fillOpacity: 1, weight: 2.5, pane: 'markerPane' })
+        .addTo(measureGroupRef.current)
+
+      /* draw segment */
+      if (pts.length >= 2) {
+        L.polyline([pts[pts.length - 2], pt], { color: '#f59e0b', weight: 2.5, dashArray: '7 5', opacity: 0.9 })
+          .addTo(measureGroupRef.current)
       }
-      onMeasureResult({ type: 'distance', value: formatDistance(total), raw: total })
-    }
-  }, [measureMode, measurePoints, onMeasureResult])
 
-  /* Measure double-click finish */
-  const handleMapDblClick = useCallback(() => {
-    if (!measureMode || measurePoints.length < 2) return
-    if (measureMode === 'area' && measurePoints.length >= 3) {
-      const ring = [...measurePoints, measurePoints[0]]
-      const poly = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring.map(p => [p.lng, p.lat])] } }
-      try {
-        import('@turf/turf').then(turf => {
-          const areaM2 = turf.area(poly)
-          const perimM = turf.length(poly, { units: 'meters' })
-          onMeasureResult({ type: 'area', value: formatArea(areaM2), perimeter: formatDistance(perimM), raw: areaM2 })
-        })
-      } catch {}
+      /* update distance result */
+      if (measureMode === 'distance' && pts.length >= 2) {
+        let total = 0
+        for (let i = 1; i < pts.length; i++) total += pts[i - 1].distanceTo(pts[i])
+        onMeasureResult({ type: 'distance', value: formatDistance(total) })
+      }
     }
-  }, [measureMode, measurePoints, onMeasureResult])
 
-  /* Basemap tile */
+    const onMapDblClick = (e) => {
+      e.originalEvent?.preventDefault()
+      e.originalEvent?.stopPropagation()
+      const pts = measurePtsRef.current
+      if (measureMode === 'area' && pts.length >= 3) {
+        L.polygon(pts, { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.15 })
+          .addTo(measureGroupRef.current)
+        try {
+          const ring = [...pts.map(p => [p.lng, p.lat]), [pts[0].lng, pts[0].lat]]
+          const areaM2 = turf.area({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } })
+          let perimeter = 0
+          for (let i = 1; i < pts.length; i++) perimeter += pts[i - 1].distanceTo(pts[i])
+          perimeter += pts[pts.length - 1].distanceTo(pts[0])
+          onMeasureResult({ type: 'area', value: formatArea(areaM2), perimeter: formatDistance(perimeter) })
+        } catch {}
+      }
+    }
+
+    map.on('click', onMapClick)
+    map.on('dblclick', onMapDblClick)
+    return () => {
+      map.off('click', onMapClick)
+      map.off('dblclick', onMapDblClick)
+      container.classList.remove('measuring')
+    }
+  }, [measureMode])
+
+  /* ── Geolocation ── */
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const onFound = (e) => {
+      locateGroupRef.current?.clearLayers()
+      L.circle(e.latlng, { radius: e.accuracy, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1.5 })
+        .addTo(locateGroupRef.current)
+      L.marker(e.latlng, { icon: L.divIcon({
+        html: `<div style="width:14px;height:14px;background:#3b82f6;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 3px rgba(59,130,246,.3)"></div>`,
+        className: '', iconAnchor: [7, 7]
+      })})
+        .addTo(locateGroupRef.current)
+        .bindPopup(`<div style="padding:10px 14px;font-family:'Inter',sans-serif;font-size:13px">
+          <div style="font-weight:700;color:#1d4ed8;margin-bottom:6px">Lokasi Anda</div>
+          <div style="color:#475569;margin:3px 0">Lat: <b>${e.latlng.lat.toFixed(6)}</b></div>
+          <div style="color:#475569;margin:3px 0">Lng: <b>${e.latlng.lng.toFixed(6)}</b></div>
+          <div style="color:#475569;margin:3px 0">Akurasi: <b>±${Math.round(e.accuracy)} m</b></div>
+        </div>`, { maxWidth: 200 })
+        .openPopup()
+    }
+    const onError = () => alert('Lokasi tidak dapat diakses. Aktifkan izin lokasi browser.')
+    map.on('locationfound', onFound)
+    map.on('locationerror', onError)
+    return () => { map.off('locationfound', onFound); map.off('locationerror', onError) }
+  }, [mapRef.current])
+
+  /* ── Basemap ── */
   const basemap = BASEMAPS.find(b => b.id === activeBasemap) || BASEMAPS[0]
 
-  /* Layer style functions */
+  /* ── Layer style helpers ── */
   const desaStyle = (feat) => ({
     fillColor: getDesaColor(feat.properties.Kepadatan),
-    color: '#1e3a8a', weight: 1.5, fillOpacity: 0.6
+    color: '#1e3a8a', weight: 1.5, fillOpacity: 0.65
   })
   const lulcStyle = (feat) => ({
     fillColor: getLulcColor(feat.properties.REMARK),
-    color: '#334155', weight: 0.5, fillOpacity: 0.65
+    color: '#1e293b', weight: 0.5, fillOpacity: 0.65
   })
 
-  /* onEachFeature handlers */
+  /* ── onEachFeature ── */
   const onEachZNT = (feat, layer) => {
     layer.bindPopup(popupZNT(feat.properties, t))
-    layer.on('mouseover', () => layer.setStyle({ weight: 2.5, fillOpacity: 0.9 }))
-    layer.on('mouseout', () => layer.setStyle({ weight: 1.5, fillOpacity: 0.7 }))
+    const origStyle = getZntStyle(feat)
+    layer.on('mouseover', () => layer.setStyle({ weight: 2.5, fillOpacity: 0.95 }))
+    layer.on('mouseout', () => layer.setStyle(origStyle))
   }
   const onEachDesa = (feat, layer) => {
     layer.bindPopup(popupDesa(feat.properties, t))
-    const kelurahan = feat.properties.NAMOBJ || ''
-    layer.bindTooltip(kelurahan, { sticky: true })
-    layer.on('mouseover', () => layer.setStyle({ weight: 2.5, fillOpacity: 0.8 }))
-    layer.on('mouseout', () => layer.setStyle({ weight: 1.5, fillOpacity: 0.6 }))
+    layer.bindTooltip(feat.properties.NAMOBJ || '', { sticky: true })
+    layer.on('mouseover', () => layer.setStyle({ weight: 2.5, fillOpacity: 0.85 }))
+    layer.on('mouseout', () => layer.setStyle(desaStyle(feat)))
   }
-  const onEachDataset = (feat, layer) => {
-    layer.bindPopup(popupDataset(feat.properties, t))
-  }
-  const makeOnEach = (label, color) => (feat, layer) => {
-    layer.bindPopup(popupGeneric(feat.properties, label, color))
-  }
+  const onEachDataset = (feat, layer) => layer.bindPopup(popupDataset(feat.properties, t))
+  const mkEach = (label, color) => (feat, layer) => layer.bindPopup(popupGeneric(feat.properties, label, color))
 
-  /* Point icon */
-  const makeIcon = (color) => L.divIcon({
-    html: `<div style="width:12px;height:12px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.4)"></div>`,
-    className: '', iconAnchor: [6, 6]
-  })
-
-  const pointLayerOptions = (layerId) => {
-    const cfg = LAYERS.find(l => l.id === layerId)
-    return {
-      pointToLayer: (_, latlng) => L.marker(latlng, { icon: makeIcon(cfg.color) })
-    }
-  }
-
-  /* Jalan Kolektor filter */
+  /* ── Jalan Kolektor filtered ── */
   const jalanData = useMemo(() => geoData.jalan ? filterKolektor(geoData.jalan) : null, [geoData.jalan])
 
   return (
     <MapContainer
-      center={MAP_CENTER}
-      zoom={MAP_ZOOM}
-      className="flex-1 z-0"
-      style={{ height: '100%' }}
+      center={[-7.302, 112.730]}
+      zoom={14}
+      className="flex-1 w-full h-full z-0"
       zoomControl={false}
       doubleClickZoom={false}
+      style={{ height: '100%', width: '100%' }}
     >
-      <TileLayer
-        key={activeBasemap}
-        url={basemap.url}
-        attribution={basemap.attr}
-        maxZoom={basemap.maxZoom}
-      />
-      <ScaleControl position="bottomleft" />
+      <TileLayer key={activeBasemap} url={basemap.url} attribution={basemap.attr} maxZoom={basemap.maxZoom} />
 
       {/* ZNT */}
       {visibleLayers.znt && geoData.znt && (
         <GeoJSON key="znt" data={geoData.znt} style={getZntStyle} onEachFeature={onEachZNT} />
       )}
-
       {/* Desa */}
       {visibleLayers.desa && geoData.desa && (
         <GeoJSON key="desa" data={geoData.desa} style={desaStyle} onEachFeature={onEachDesa} />
       )}
-
       {/* LULC */}
       {visibleLayers.lulc && geoData.lulc && (
-        <GeoJSON key="lulc" data={geoData.lulc} style={lulcStyle} onEachFeature={makeOnEach('LULC', '#16a34a')} />
+        <GeoJSON key="lulc" data={geoData.lulc} style={lulcStyle} onEachFeature={mkEach('LULC', '#16a34a')} />
       )}
-
-      {/* Jalan Kolektor */}
+      {/* Jalan */}
       {visibleLayers.jalan && jalanData && (
         <GeoJSON key="jalan" data={jalanData}
           style={{ color: '#dc2626', weight: 2.5, opacity: 0.9 }}
-          onEachFeature={makeOnEach(t.layers, '#dc2626')} />
+          onEachFeature={mkEach('Jalan Kolektor', '#dc2626')} />
       )}
-
       {/* Sungai */}
       {visibleLayers.sungai && geoData.sungai && (
         <GeoJSON key="sungai" data={geoData.sungai}
           style={{ color: '#0369a1', weight: 2, opacity: 0.9 }}
-          onEachFeature={makeOnEach('Sungai', '#0369a1')} />
+          onEachFeature={mkEach('Sungai', '#0369a1')} />
       )}
-
-      {/* Point layers */}
-      {visibleLayers.faskes && geoData.faskes && (
-        <GeoJSON key="faskes" data={geoData.faskes} {...pointLayerOptions('faskes')} onEachFeature={makeOnEach('Faskes', '#dc2626')} />
-      )}
-      {visibleLayers.pendidikan && geoData.pendidikan && (
-        <GeoJSON key="pendidikan" data={geoData.pendidikan} {...pointLayerOptions('pendidikan')} onEachFeature={makeOnEach('Pendidikan', '#d97706')} />
-      )}
-      {visibleLayers.cbd && geoData.cbd && (
-        <GeoJSON key="cbd" data={geoData.cbd} {...pointLayerOptions('cbd')} onEachFeature={makeOnEach('CBD', '#7c3aed')} />
-      )}
-      {visibleLayers.pasar && geoData.pasar && (
-        <GeoJSON key="pasar" data={geoData.pasar} {...pointLayerOptions('pasar')} onEachFeature={makeOnEach('Pasar', '#ea580c')} />
-      )}
-      {visibleLayers.transportasi && geoData.transportasi && (
-        <GeoJSON key="transportasi" data={geoData.transportasi} {...pointLayerOptions('transportasi')} onEachFeature={makeOnEach('Transportasi', '#0891b2')} />
-      )}
-
-      {/* Dataset */}
+      {/* Points */}
+      {[
+        { id: 'faskes',       label: 'Faskes',        color: '#e11d48' },
+        { id: 'pendidikan',   label: 'Pendidikan',    color: '#d97706' },
+        { id: 'cbd',          label: 'CBD',           color: '#7c3aed' },
+        { id: 'pasar',        label: 'Pasar',         color: '#ea580c' },
+        { id: 'transportasi', label: 'Transportasi',  color: '#0891b2' }
+      ].map(({ id, label, color }) => visibleLayers[id] && geoData[id] && (
+        <GeoJSON key={id} data={geoData[id]}
+          pointToLayer={(_, ll) => L.marker(ll, { icon: dotIcon(color) })}
+          onEachFeature={mkEach(label, color)} />
+      ))}
+      {/* Dataset – Bhumi classification */}
       {visibleLayers.dataset && geoData.dataset && (
         <GeoJSON key="dataset" data={geoData.dataset}
-          pointToLayer={(feat, latlng) => {
-            const harga = feat.properties.Harga || 0
-            const color = harga > 8000000 ? '#7c3aed' : harga > 6000000 ? '#dc2626' : '#f59e0b'
-            return L.marker(latlng, { icon: L.divIcon({
-              html: `<div style="width:14px;height:14px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></div>`,
-              className: '', iconAnchor: [7, 7]
-            })})
-          }}
-          onEachFeature={onEachDataset}
-        />
+          pointToLayer={(feat, ll) => L.marker(ll, { icon: dotIcon(getDatasetColor(feat.properties.Harga || 0), 14) })}
+          onEachFeature={onEachDataset} />
       )}
-
-      {/* Buffer layers */}
+      {/* Buffers */}
       {LAYERS.filter(l => l.buffer).map(layer =>
         BUFFER_DISTANCES.map(dist => {
           const key = `${layer.id}_${dist}`
-          const data = bufferCache[key]
-          if (!activeBuffers[key] || !data) return null
+          if (!activeBuffers[key] || !bufferCache[key]) return null
           return (
-            <GeoJSON
-              key={key}
-              data={data}
-              style={() => getBufferStyle(dist)}
-            />
+            <GeoJSON key={key} data={bufferCache[key]} style={() => getBufferStyle(dist)} />
           )
         })
       )}
 
-      {/* Measure overlay */}
-      {measureMode && measurePoints.length > 0 && mapRef.current && (
-        <MeasureOverlay
-          map={mapRef.current}
-          mode={measureMode}
-          points={measurePoints}
-          onFinish={handleMapDblClick}
-        />
-      )}
-
       <MapController
-        onReady={(m) => { mapRef.current = m; onMapReady(m) }}
+        onReady={(map) => { mapRef.current = map; onMapReady(map) }}
         onMouseMove={onCoordsChange}
-        measureMode={measureMode}
-        measurePoints={measurePoints}
-        onMapClick={handleMapClick}
-        onMapDblClick={handleMapDblClick}
       />
     </MapContainer>
   )
