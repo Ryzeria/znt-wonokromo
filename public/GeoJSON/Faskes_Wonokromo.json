@@ -1,0 +1,8 @@
+{"type":"FeatureCollection", "features": [
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.7411034480001,-7.291565557999945,0,-1.7976931348623157e+308]},"properties":{"NAMOBJ":"","LUAS":0,"REMARK":"Fasilitas Kesehatan Lainnya","TIPSHT":999,"FCODE":"","SRS_ID":"","LCODE":"GI0020","METADATA":"","FSKADD":""}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.74888120500009,-7.293280405999951,0,-1.7976931348623157e+308]},"properties":{"NAMOBJ":"","LUAS":0,"REMARK":"Fasilitas Kesehatan Lainnya","TIPSHT":999,"FCODE":"","SRS_ID":"","LCODE":"GI0020","METADATA":"","FSKADD":""}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.72270796800001,-7.297374918999935,0,-1.7976931348623157e+308]},"properties":{"NAMOBJ":"","LUAS":0,"REMARK":"Fasilitas Kesehatan Lainnya","TIPSHT":999,"FCODE":"","SRS_ID":"","LCODE":"GI0020","METADATA":"","FSKADD":""}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73444560900009,-7.306915395999965,0,-1.7976931348623157e+308]},"properties":{"NAMOBJ":"","LUAS":0,"REMARK":"Fasilitas Kesehatan Lainnya","TIPSHT":999,"FCODE":"","SRS_ID":"","LCODE":"GI0020","METADATA":"","FSKADD":""}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73893880000003,-7.308924901999944,0,-1.7976931348623157e+308]},"properties":{"NAMOBJ":"","LUAS":0,"REMARK":"Fasilitas Kesehatan Lainnya","TIPSHT":999,"FCODE":"","SRS_ID":"","LCODE":"GI0020","METADATA":"","FSKADD":""}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.75255861500011,-7.305327095999928,0,-1.7976931348623157e+308]},"properties":{"NAMOBJ":"","LUAS":0,"REMARK":"Fasilitas Kesehatan Lainnya","TIPSHT":999,"FCODE":"","SRS_ID":"","LCODE":"GI0020","METADATA":"","FSKADD":""}}
+]}

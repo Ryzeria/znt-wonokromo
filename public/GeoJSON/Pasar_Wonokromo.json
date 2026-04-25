@@ -1,0 +1,9 @@
+{"type":"FeatureCollection", "features": [
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73462100000006,-7.3020649999999705]},"properties":{"Nama":"Pasar Wonokromo (DTC)","Latitude":-7.302065,"Longitude":112.734621}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.7409110000001,-7.30176599999993]},"properties":{"Nama":"Pasar Mangga Dua","Latitude":-7.301766,"Longitude":112.740911}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.74205000000006,-7.302658999999949]},"properties":{"Nama":"Pasar Jagir","Latitude":-7.302659,"Longitude":112.74205}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73536200000001,-7.303258999999969]},"properties":{"Nama":"Pasar Jongkok Wonokromo","Latitude":-7.303259,"Longitude":112.735362}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.74669400000005,-7.293867999999975]},"properties":{"Nama":"Pasar Darmo Jaya","Latitude":-7.293868,"Longitude":112.746694}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.74618100000009,-7.29377599999998]},"properties":{"Nama":"Pasar Ngagel","Latitude":-7.293776,"Longitude":112.746181}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.72301900000002,-7.294783999999936]},"properties":{"Nama":"Pasar Surya Wonokitri","Latitude":-7.294784,"Longitude":112.723019}}
+]}

@@ -1,0 +1,5 @@
+{"type":"FeatureCollection", "features": [
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.7313210000001,-7.294373999999948]},"properties":{"Nama":"Surabaya Town Square (Sutos)","Latitude":-7.294374,"Longitude":112.731321}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73463300000003,-7.308929999999975]},"properties":{"Nama":"Royal Plaza Surabaya","Latitude":-7.30893,"Longitude":112.734633}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.7432500000001,-7.288776999999925]},"properties":{"Nama":"Marvell City Mall","Latitude":-7.288777,"Longitude":112.74325}}
+]}

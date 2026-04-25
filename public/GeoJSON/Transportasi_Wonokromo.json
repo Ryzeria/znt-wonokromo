@@ -1,0 +1,5 @@
+{"type":"FeatureCollection", "features": [
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73800300000005,-7.303662999999972]},"properties":{"Nama":"Terminal Wonokromo","Latitude":-7.303663,"Longitude":112.738003}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73648800000001,-7.298981999999967]},"properties":{"Nama":"Terminal Joyoboyo","Latitude":-7.298982,"Longitude":112.736488}},
+{"type":"Feature","geometry":{"type":"Point","coordinates":[112.73777200000006,-7.302466999999979]},"properties":{"Nama":"Stasiun Wonokromo","Latitude":-7.302467,"Longitude":112.737772}}
+]}
