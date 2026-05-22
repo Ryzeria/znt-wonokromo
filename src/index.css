@@ -4,63 +4,90 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  html, body, #root { height: 100%; margin: 0; padding: 0; }
-  body { font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+  html { height: 100%; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; min-height: 100%; }
+  #root { min-height: 100%; }
+}
+
+/* ─── WebGIS full-screen mode (applied via JS) ── */
+body.webgis-active {
+  overflow: hidden;
+  height: 100vh;
+}
+body.webgis-active #root {
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ─── Leaflet ───────────────────────────────────────── */
-.leaflet-container { height: 100%; width: 100%; background: #dde8db; }
+.leaflet-container { height: 100%; width: 100%; background: #e8ecef; }
 .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
 .leaflet-popup-content-wrapper {
-  border-radius: 12px !important; padding: 0 !important; overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18) !important;
+  border-radius: 10px !important; padding: 0 !important; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.12) !important;
+  border: 1px solid #e2e8f0 !important;
 }
 .leaflet-popup-content { margin: 0 !important; width: auto !important; }
 .leaflet-popup-close-button {
   top: 8px !important; right: 8px !important; z-index: 10;
-  color: #64748b !important; font-size: 18px !important;
-  width: 24px !important; height: 24px !important;
+  color: #64748b !important; font-size: 16px !important;
+  width: 22px !important; height: 22px !important;
 }
 .leaflet-tooltip {
-  background: rgba(15,23,42,0.9) !important; border: none !important;
+  background: rgba(15,23,42,0.88) !important; border: none !important;
   border-radius: 6px !important; color: #f1f5f9 !important;
   font-size: 11px !important; padding: 3px 8px !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important; font-family: 'Inter', sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important; font-family: 'Inter', sans-serif;
 }
 .leaflet-tooltip::before { display: none !important; }
 
 /* ─── Measure cursor ────────────────────────────────── */
 .leaflet-container.measuring { cursor: crosshair !important; }
 
-/* ─── Glass utility ─────────────────────────────────── */
+/* ─── Glass / panel utilities ───────────────────────── */
 @layer components {
-  .glass {
-    @apply bg-white/95 dark:bg-slate-900/95 backdrop-blur-md
-           border border-slate-200/80 dark:border-slate-700/80;
-  }
-  .glass-card {
-    @apply glass rounded-xl shadow-xl shadow-black/10 dark:shadow-black/40;
+  .panel-card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-sm;
   }
   .tool-btn {
-    @apply relative flex items-center justify-center rounded-lg
-           text-slate-500 dark:text-slate-400
-           hover:bg-slate-100 dark:hover:bg-slate-800
-           hover:text-slate-800 dark:hover:text-slate-200
+    @apply relative flex items-center justify-center rounded-lg w-8 h-8
+           text-slate-500 hover:bg-slate-100 hover:text-slate-800
            transition-all duration-150 cursor-pointer select-none;
   }
   .tool-btn.active {
-    @apply bg-blue-600 text-white hover:bg-blue-700 dark:hover:bg-blue-600;
+    @apply bg-blue-600 text-white hover:bg-blue-700;
   }
   .tool-btn.danger-active {
     @apply bg-red-500 text-white hover:bg-red-600;
   }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700
+           text-white text-sm font-medium transition-colors;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200
+           hover:bg-slate-50 text-slate-700 text-sm font-medium transition-colors;
+  }
 }
 
 /* ─── Scrollbar ─────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
-.dark ::-webkit-scrollbar-thumb { background: #475569; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ─── Range slider ──────────────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  background: #e2e8f0; height: 3px; border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px;
+  border-radius: 50%; background: #2563eb; margin-top: -4.5px; border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
 
 /* ─── Print / PDF export ────────────────────────────── */
 @media print {
@@ -76,21 +103,14 @@
   @page { margin: 0; size: landscape; }
 }
 
-/* ─── Opacity slider ────────────────────────────────── */
-.opacity-slider { -webkit-appearance: none; appearance: none; background: transparent; }
-.opacity-slider::-webkit-slider-runnable-track { background: #e2e8f0; height: 3px; border-radius: 2px; }
-.dark .opacity-slider::-webkit-slider-runnable-track { background: #334155; }
-.opacity-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-top: -3.5px; cursor: pointer; }
-
 /* ─── Animations ────────────────────────────────────── */
-@keyframes slideLeft  { from { transform: translateX(-16px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-@keyframes slideRight { from { transform: translateX(16px);  opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideLeft  { from { transform: translateX(-12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideRight { from { transform: translateX(12px);  opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes slideUp    { from { transform: translateY(8px);   opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-@keyframes fadeScale  { from { transform: scale(.96);        opacity: 0; } to { transform: scale(1);    opacity: 1; } }
 @keyframes fadeIn     { from { opacity: 0; } to { opacity: 1; } }
+@keyframes countUp    { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-.anim-left  { animation: slideLeft  .22s ease-out; }
-.anim-right { animation: slideRight .22s ease-out; }
-.anim-up    { animation: slideUp    .18s ease-out; }
-.anim-scale { animation: fadeScale  .18s ease-out; }
+.anim-left  { animation: slideLeft  .2s ease-out; }
+.anim-right { animation: slideRight .2s ease-out; }
+.anim-up    { animation: slideUp    .16s ease-out; }
 .anim-fade  { animation: fadeIn     .15s ease-out; }

@@ -5,25 +5,16 @@ import MapView from '../components/MapView'
 import Toolbar from '../components/Toolbar'
 import SidePanel from '../components/SidePanel'
 import Modals from '../components/Modals'
-import NavBar from '../components/NavBar'
 
 const BASE = import.meta.env.BASE_URL
 
-function initLayers() {
-  return Object.fromEntries(LAYERS.map(l => [l.id, l.defaultOn]))
-}
-
-function initOpacities() {
-  return Object.fromEntries(LAYERS.map(l => [l.id, 0.78]))
-}
+function initLayers()    { return Object.fromEntries(LAYERS.map(l => [l.id, l.defaultOn])) }
+function initOpacities() { return Object.fromEntries(LAYERS.map(l => [l.id, 0.78])) }
 
 export default function WebGIS() {
-  /* ── Preferences ── */
   const [theme, setTheme]       = useState(() => localStorage.getItem('znt-theme') || 'light')
   const [language, setLanguage] = useState(() => localStorage.getItem('znt-lang')  || 'id')
-
-  /* ── Map state ── */
-  const [activeBasemap,  setActiveBasemap]  = useState('osm')
+  const [activeBasemap,  setActiveBasemap]  = useState('positron')
   const [visibleLayers,  setVisibleLayers]  = useState(() => {
     const shared = parseShareUrl()
     if (shared.layers) return Object.fromEntries(LAYERS.map(l => [l.id, shared.layers.includes(l.id)]))
@@ -34,17 +25,12 @@ export default function WebGIS() {
   const [measureMode,    setMeasureMode]    = useState(null)
   const [measureResult,  setMeasureResult]  = useState(null)
   const [clearCount,     setClearCount]     = useState(0)
-
-  /* ── Heatmap / bubble / filter ── */
   const [heatmapOn,      setHeatmapOn]      = useState(false)
   const [heatmapRadius,  setHeatmapRadius]  = useState(25)
   const [bubblesOn,      setBubblesOn]      = useState(false)
-  const [filterClass,    setFilterClass]    = useState('all')   // 'all'|'low'|'mid'|'high'
+  const [filterClass,    setFilterClass]    = useState('all')
   const [filterDesa,     setFilterDesa]     = useState('all')
   const [filterSearch,   setFilterSearch]   = useState('')
-  const [show3D,         setShow3D]         = useState(false)
-
-  /* ── UI state ── */
   const [activeModal,    setActiveModal]    = useState(null)
   const [isLeftOpen,     setIsLeftOpen]     = useState(true)
   const [isFullscreen,   setIsFullscreen]   = useState(false)
@@ -53,12 +39,15 @@ export default function WebGIS() {
   const mapRef = useRef(null)
   const t      = T[language]
 
+  /* Lock body scroll for map page */
   useEffect(() => {
     document.title = 'WebGIS – ZNT Wonokromo'
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-    localStorage.setItem('znt-theme', theme)
-  }, [theme])
+    document.documentElement.classList.remove('dark')
+    document.body.classList.add('webgis-active')
+    return () => { document.body.classList.remove('webgis-active') }
+  }, [])
 
+  useEffect(() => { localStorage.setItem('znt-theme', theme) }, [theme])
   useEffect(() => { localStorage.setItem('znt-lang', language) }, [language])
 
   useEffect(() => {
@@ -75,8 +64,8 @@ export default function WebGIS() {
   }, [])
 
   useEffect(() => {
-    if (theme === 'dark' && activeBasemap === 'osm')  setActiveBasemap('dark')
-    if (theme === 'light' && activeBasemap === 'dark') setActiveBasemap('osm')
+    if (theme === 'dark' && activeBasemap === 'positron') setActiveBasemap('dark')
+    if (theme === 'light' && activeBasemap === 'dark')    setActiveBasemap('positron')
   }, [theme])
 
   const toggleTheme    = () => setTheme(p => p === 'light' ? 'dark' : 'light')
@@ -86,41 +75,36 @@ export default function WebGIS() {
   const setOpacity     = useCallback((id, v) => setLayerOpacities(p => ({ ...p, [id]: v })), [])
 
   const clearMeasure = useCallback(() => {
-    setMeasureMode(null)
-    setMeasureResult(null)
-    setClearCount(p => p + 1)
+    setMeasureMode(null); setMeasureResult(null); setClearCount(p => p + 1)
   }, [])
 
   const handleSetMeasureMode = (mode) => {
-    setMeasureMode(mode)
-    if (!mode) setMeasureResult(null)
+    setMeasureMode(mode); if (!mode) setMeasureResult(null)
   }
 
   return (
-    <div className={`h-screen w-screen flex flex-col overflow-hidden select-none ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className={`fixed inset-0 flex flex-col ${theme === 'dark' ? 'dark' : ''}`} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
 
       {/* ── Header ── */}
-      <header className="flex-shrink-0 h-12 bg-gradient-to-r from-[#071428] via-[#0e2452] to-[#1a3a7a] dark:from-[#020817] dark:via-[#0a1628] dark:to-[#0e1f40] flex items-center px-4 gap-4 z-[500] shadow-2xl">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="flex-shrink-0 w-7 h-7 rounded-md overflow-hidden bg-white/10 border border-white/20 flex items-center justify-center p-0.5">
-            <img src={`${BASE}assets/logo.svg`} alt="Logo" className="w-full h-full object-contain"
-              onError={e => { e.target.src = `${BASE}assets/logo.png` }} />
-          </div>
+      <header className="flex-shrink-0 h-12 bg-white border-b border-slate-200 flex items-center px-4 gap-4 z-[500] shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <a href="/" className="flex items-center gap-2 group flex-shrink-0">
+            <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center p-1 group-hover:border-blue-300 transition-colors">
+              <img src={`${BASE}assets/logo.svg`} alt="Logo" className="w-full h-full object-contain"
+                onError={e => { e.target.src = `${BASE}assets/logo.png` }} />
+            </div>
+          </a>
           <div className="min-w-0">
-            <h1 className="text-white font-bold text-sm leading-tight truncate">{t.title}</h1>
-            <p className="text-blue-300/60 text-[10px] leading-none truncate hidden sm:block">{t.subtitle}</p>
+            <h1 className="text-slate-900 font-semibold text-sm leading-tight truncate">{t.title}</h1>
+            <p className="text-slate-400 text-[10px] leading-none truncate hidden sm:block">{t.subtitle}</p>
           </div>
         </div>
 
         {/* Page links */}
-        <div className="hidden md:flex items-center gap-1">
-          {[
-            { href: '/', label: 'Home' },
-            { href: '/storymap', label: 'StoryMap' },
-            { href: '/dashboard', label: 'Dashboard' },
-          ].map(({ href, label }) => (
+        <div className="hidden md:flex items-center gap-0.5">
+          {[{ href: '/', label: 'Beranda' }, { href: '/storymap', label: 'StoryMap' }, { href: '/dashboard', label: 'Dashboard' }].map(({ href, label }) => (
             <a key={href} href={href}
-              className="px-2.5 py-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 text-xs font-medium transition-colors">
+              className="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition-colors">
               {label}
             </a>
           ))}
@@ -128,19 +112,13 @@ export default function WebGIS() {
 
         <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0">
           {['LightGBM', 'AHP', 'GIS'].map(b => (
-            <span key={b} className="px-2 py-0.5 rounded-full bg-white/[0.08] border border-white/[0.12] text-white/60 text-[10px] font-medium">{b}</span>
+            <span key={b} className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-medium border border-blue-100">{b}</span>
           ))}
         </div>
 
-        <div className="flex-shrink-0 flex items-center gap-3">
-          <div className="hidden sm:flex flex-col items-end">
-            <span className="text-white/50 text-[9px] leading-tight">Kec. Wonokromo</span>
-            <span className="text-white/50 text-[9px] leading-tight">Kota Surabaya</span>
-          </div>
-          <div className="w-8 h-8 rounded-lg bg-white/[0.08] border border-white/[0.15] flex items-center justify-center p-1">
-            <img src={`${BASE}assets/logo.svg`} alt="Logo" className="w-full h-full object-contain"
-              onError={e => { e.target.src = `${BASE}assets/logo.png` }} />
-          </div>
+        <div className="hidden sm:flex flex-col items-end flex-shrink-0">
+          <span className="text-slate-400 text-[9px] leading-tight">Kec. Wonokromo</span>
+          <span className="text-slate-400 text-[9px] leading-tight">Kota Surabaya</span>
         </div>
       </header>
 
@@ -206,23 +184,19 @@ export default function WebGIS() {
           toggleTheme={toggleTheme}
           language={language}
           toggleLanguage={toggleLanguage}
-          show3D={show3D}
-          onToggle3D={() => setShow3D(p => !p)}
         />
       </main>
 
       {/* ── Status bar ── */}
-      <footer className="flex-shrink-0 h-5 bg-[#071428]/95 dark:bg-[#020817]/95 border-t border-white/[0.06] flex items-center px-3 gap-4 text-[10px] font-mono text-slate-500 z-[500]">
+      <footer className="flex-shrink-0 h-5 bg-slate-50 border-t border-slate-200 flex items-center px-3 gap-4 text-[10px] font-mono text-slate-400 z-[500]">
         <span className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-slate-400">
-            {hoverCoords.lat?.toFixed(6)}&deg;N &nbsp; {hoverCoords.lng?.toFixed(6)}&deg;E
-          </span>
+          {hoverCoords.lat?.toFixed(6)}°N &nbsp; {hoverCoords.lng?.toFixed(6)}°E
         </span>
-        <span className="text-slate-600 hidden sm:block">WGS 84 / EPSG:4326</span>
+        <span className="hidden sm:block">WGS 84 / EPSG:4326</span>
         <span className="flex-1" />
-        <span className="text-slate-600 hidden md:block">© OSM · Esri · CartoDB · Google</span>
-        <span className="text-slate-600">WebGIS ZNT Wonokromo 2024</span>
+        <span className="hidden md:block">© OSM · Esri · CartoDB</span>
+        <span>ZNT Wonokromo 2024</span>
       </footer>
 
       <Modals
