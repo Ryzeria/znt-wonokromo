@@ -76,6 +76,12 @@
   @page { margin: 0; size: landscape; }
 }
 
+/* ─── Opacity slider ────────────────────────────────── */
+.opacity-slider { -webkit-appearance: none; appearance: none; background: transparent; }
+.opacity-slider::-webkit-slider-runnable-track { background: #e2e8f0; height: 3px; border-radius: 2px; }
+.dark .opacity-slider::-webkit-slider-runnable-track { background: #334155; }
+.opacity-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; margin-top: -3.5px; cursor: pointer; }
+
 /* ─── Animations ────────────────────────────────────── */
 @keyframes slideLeft  { from { transform: translateX(-16px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes slideRight { from { transform: translateX(16px);  opacity: 0; } to { transform: translateX(0); opacity: 1; } }

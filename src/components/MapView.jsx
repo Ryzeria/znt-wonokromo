@@ -34,10 +34,75 @@ function dotIcon(color, size = 12) {
   })
 }
 
+/* ─── Bubble icon factory ────────────────────────────── */
+function bubbleIcon(color, size) {
+  const s = Math.max(8, Math.min(40, size))
+  return L.divIcon({
+    html: `<div style="width:${s}px;height:${s}px;background:${color};border:2px solid rgba(255,255,255,0.7);border-radius:50%;opacity:0.75;box-shadow:0 2px 8px rgba(0,0,0,.35)"></div>`,
+    className: '', iconAnchor: [s / 2, s / 2]
+  })
+}
+
+/* ─── Heatmap Layer ──────────────────────────────────── */
+function HeatmapLayer({ data, radius }) {
+  const map = useMap()
+  const heatRef = useRef(null)
+
+  useEffect(() => {
+    if (!data?.features?.length) return
+    import('leaflet.heat').then(() => {
+      if (heatRef.current) { heatRef.current.remove(); heatRef.current = null }
+      const pts = data.features
+        .filter(f => f.geometry?.type === 'Point' && f.properties?.Harga > 0)
+        .map(f => {
+          const [lng, lat] = f.geometry.coordinates
+          const intensity = Math.min(1, f.properties.Harga / 25_000_000)
+          return [lat, lng, intensity]
+        })
+      if (pts.length) {
+        heatRef.current = L.heatLayer(pts, {
+          radius, blur: 20, maxZoom: 17,
+          gradient: { 0.0: '#0000ff', 0.3: '#00ffff', 0.5: '#00ff00', 0.7: '#ffff00', 1.0: '#ff0000' }
+        }).addTo(map)
+      }
+    }).catch(() => {})
+    return () => { if (heatRef.current) { heatRef.current.remove(); heatRef.current = null } }
+  }, [data, radius, map])
+
+  return null
+}
+
+/* ─── GeoJSON with opacity support ──────────────────── */
+function OpacityGeoJSON({ data, style, onEachFeature, pointToLayer, opacity = 0.78, layerKey }) {
+  const map = useMap()
+  const layerRef = useRef(null)
+
+  const resolvedStyle = useMemo(() => {
+    if (typeof style !== 'function') {
+      return { ...style, fillOpacity: (style.fillOpacity ?? 0.65) * opacity / 0.78, opacity: style.opacity ?? 0.9 }
+    }
+    return (feat) => {
+      const s = style(feat)
+      return { ...s, fillOpacity: (s.fillOpacity ?? 0.65) * opacity / 0.78 }
+    }
+  }, [style, opacity])
+
+  if (!data) return null
+  return (
+    <GeoJSON key={`${layerKey}-${opacity}`} data={data}
+      style={resolvedStyle}
+      onEachFeature={onEachFeature}
+      pointToLayer={pointToLayer} />
+  )
+}
+
 /* ─── Main MapView ──────────────────────────────────── */
 export default function MapView({
-  t, activeBasemap, visibleLayers, activeBuffers,
+  t, activeBasemap, visibleLayers, layerOpacities = {}, activeBuffers,
   measureMode, clearCount,
+  heatmapOn, heatmapRadius = 25,
+  bubblesOn,
+  filterClass = 'all', filterDesa = 'all', filterSearch = '',
   onMapReady, onCoordsChange, onMeasureResult
 }) {
   const [geoData, setGeoData] = useState({})
@@ -46,7 +111,7 @@ export default function MapView({
   const measureGroupRef = useRef(null)
   const measurePtsRef   = useRef([])
   const locateGroupRef  = useRef(null)
-  const computedRef     = useRef(new Set())  // avoid duplicate buffer computation
+  const computedRef     = useRef(new Set())
 
   /* ── Load GeoJSON ── */
   useEffect(() => {
@@ -58,7 +123,7 @@ export default function MapView({
     })
   }, [])
 
-  /* ── Compute buffers (lazy, one-shot per key) ── */
+  /* ── Compute buffers ── */
   useEffect(() => {
     LAYERS.filter(l => l.buffer).forEach(layer => {
       if (!geoData[layer.id]) return
@@ -73,7 +138,7 @@ export default function MapView({
     })
   }, [geoData])
 
-  /* ── Init measure + locate layer groups ── */
+  /* ── Init layer groups ── */
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -85,14 +150,14 @@ export default function MapView({
     }
   }, [mapRef.current])
 
-  /* ── Clear measure layers ── */
+  /* ── Clear measure ── */
   useEffect(() => {
     if (!measureGroupRef.current) return
     measureGroupRef.current.clearLayers()
     measurePtsRef.current = []
   }, [clearCount])
 
-  /* ── Measure tool: bind / unbind on mode change ── */
+  /* ── Measure tool ── */
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -109,17 +174,14 @@ export default function MapView({
       measurePtsRef.current = [...measurePtsRef.current, pt]
       const pts = measurePtsRef.current
 
-      /* draw point */
       L.circleMarker(pt, { radius: 5, color: '#f59e0b', fillColor: '#fff', fillOpacity: 1, weight: 2.5, pane: 'markerPane' })
         .addTo(measureGroupRef.current)
 
-      /* draw segment */
       if (pts.length >= 2) {
         L.polyline([pts[pts.length - 2], pt], { color: '#f59e0b', weight: 2.5, dashArray: '7 5', opacity: 0.9 })
           .addTo(measureGroupRef.current)
       }
 
-      /* update distance result */
       if (measureMode === 'distance' && pts.length >= 2) {
         let total = 0
         for (let i = 1; i < pts.length; i++) total += pts[i - 1].distanceTo(pts[i])
@@ -184,7 +246,7 @@ export default function MapView({
   /* ── Basemap ── */
   const basemap = BASEMAPS.find(b => b.id === activeBasemap) || BASEMAPS[0]
 
-  /* ── Layer style helpers ── */
+  /* ── Style helpers ── */
   const desaStyle = (feat) => ({
     fillColor: getDesaColor(feat.properties.Kepadatan),
     color: '#1e3a8a', weight: 1.5, fillOpacity: 0.65
@@ -210,8 +272,29 @@ export default function MapView({
   const onEachDataset = (feat, layer) => layer.bindPopup(popupDataset(feat.properties, t))
   const mkEach = (label, color) => (feat, layer) => layer.bindPopup(popupGeneric(feat.properties, label, color))
 
-  /* ── Jalan Kolektor filtered ── */
+  /* ── Jalan filtered ── */
   const jalanData = useMemo(() => geoData.jalan ? filterKolektor(geoData.jalan) : null, [geoData.jalan])
+
+  /* ── Dataset filtered by class / desa / search ── */
+  const filteredDataset = useMemo(() => {
+    if (!geoData.dataset) return null
+    let feats = geoData.dataset.features
+    if (filterClass === 'low')  feats = feats.filter(f => (f.properties?.Harga || 0) < 5_000_000)
+    if (filterClass === 'mid')  feats = feats.filter(f => { const h = f.properties?.Harga || 0; return h >= 5_000_000 && h <= 20_000_000 })
+    if (filterClass === 'high') feats = feats.filter(f => (f.properties?.Harga || 0) > 20_000_000)
+    if (filterDesa !== 'all')   feats = feats.filter(f => (f.properties?.NAMOBJ || f.properties?.Kelurahan || '').toLowerCase().includes(filterDesa.toLowerCase()))
+    if (filterSearch)           feats = feats.filter(f => JSON.stringify(f.properties).toLowerCase().includes(filterSearch.toLowerCase()))
+    return { ...geoData.dataset, features: feats }
+  }, [geoData.dataset, filterClass, filterDesa, filterSearch])
+
+  /* ── Bubble sizes ── */
+  const bubbleDataset = useMemo(() => {
+    if (!filteredDataset) return null
+    const maxH = Math.max(...(filteredDataset.features.map(f => f.properties?.Harga || 0)))
+    return { data: filteredDataset, maxH }
+  }, [filteredDataset])
+
+  const op = (id) => layerOpacities[id] ?? 0.78
 
   return (
     <MapContainer
@@ -226,29 +309,35 @@ export default function MapView({
 
       {/* ZNT */}
       {visibleLayers.znt && geoData.znt && (
-        <GeoJSON key="znt" data={geoData.znt} style={getZntStyle} onEachFeature={onEachZNT} />
+        <GeoJSON key={`znt-${op('znt')}`} data={geoData.znt}
+          style={(feat) => { const s = getZntStyle(feat); return { ...s, fillOpacity: s.fillOpacity * op('znt') / 0.78 } }}
+          onEachFeature={onEachZNT} />
       )}
       {/* Desa */}
       {visibleLayers.desa && geoData.desa && (
-        <GeoJSON key="desa" data={geoData.desa} style={desaStyle} onEachFeature={onEachDesa} />
+        <GeoJSON key={`desa-${op('desa')}`} data={geoData.desa}
+          style={(feat) => { const s = desaStyle(feat); return { ...s, fillOpacity: s.fillOpacity * op('desa') / 0.78 } }}
+          onEachFeature={onEachDesa} />
       )}
       {/* LULC */}
       {visibleLayers.lulc && geoData.lulc && (
-        <GeoJSON key="lulc" data={geoData.lulc} style={lulcStyle} onEachFeature={mkEach('LULC', '#16a34a')} />
+        <GeoJSON key={`lulc-${op('lulc')}`} data={geoData.lulc}
+          style={(feat) => { const s = lulcStyle(feat); return { ...s, fillOpacity: s.fillOpacity * op('lulc') / 0.78 } }}
+          onEachFeature={mkEach('LULC', '#16a34a')} />
       )}
       {/* Jalan */}
       {visibleLayers.jalan && jalanData && (
-        <GeoJSON key="jalan" data={jalanData}
-          style={{ color: '#dc2626', weight: 2.5, opacity: 0.9 }}
+        <GeoJSON key={`jalan-${op('jalan')}`} data={jalanData}
+          style={{ color: '#dc2626', weight: 2.5, opacity: 0.9 * op('jalan') / 0.78 }}
           onEachFeature={mkEach('Jalan Kolektor', '#dc2626')} />
       )}
       {/* Sungai */}
       {visibleLayers.sungai && geoData.sungai && (
-        <GeoJSON key="sungai" data={geoData.sungai}
-          style={{ color: '#0369a1', weight: 2, opacity: 0.9 }}
+        <GeoJSON key={`sungai-${op('sungai')}`} data={geoData.sungai}
+          style={{ color: '#0369a1', weight: 2, opacity: 0.9 * op('sungai') / 0.78 }}
           onEachFeature={mkEach('Sungai', '#0369a1')} />
       )}
-      {/* Points */}
+      {/* Point layers */}
       {[
         { id: 'faskes',       label: 'Faskes',        color: '#e11d48' },
         { id: 'pendidikan',   label: 'Pendidikan',    color: '#d97706' },
@@ -256,16 +345,35 @@ export default function MapView({
         { id: 'pasar',        label: 'Pasar',         color: '#ea580c' },
         { id: 'transportasi', label: 'Transportasi',  color: '#0891b2' }
       ].map(({ id, label, color }) => visibleLayers[id] && geoData[id] && (
-        <GeoJSON key={id} data={geoData[id]}
-          pointToLayer={(_, ll) => L.marker(ll, { icon: dotIcon(color) })}
+        <GeoJSON key={`${id}-${op(id)}`} data={geoData[id]}
+          pointToLayer={(_, ll) => L.marker(ll, { icon: dotIcon(color, 12) })}
           onEachFeature={mkEach(label, color)} />
       ))}
-      {/* Dataset – Bhumi classification */}
-      {visibleLayers.dataset && geoData.dataset && (
-        <GeoJSON key="dataset" data={geoData.dataset}
+
+      {/* Dataset dots (normal or bubbles) */}
+      {visibleLayers.dataset && filteredDataset && !bubblesOn && (
+        <GeoJSON key={`dataset-${op('dataset')}-${filterClass}-${filterDesa}-${filterSearch.length}`}
+          data={filteredDataset}
           pointToLayer={(feat, ll) => L.marker(ll, { icon: dotIcon(getDatasetColor(feat.properties.Harga || 0), 14) })}
           onEachFeature={onEachDataset} />
       )}
+      {/* Bubble overlay */}
+      {visibleLayers.dataset && bubblesOn && bubbleDataset && (
+        <GeoJSON key={`bubbles-${op('dataset')}-${filterClass}-${filterDesa}-${filterSearch.length}`}
+          data={bubbleDataset.data}
+          pointToLayer={(feat, ll) => {
+            const h = feat.properties?.Harga || 0
+            const size = 8 + (h / bubbleDataset.maxH) * 36
+            return L.marker(ll, { icon: bubbleIcon(getDatasetColor(h), size) })
+          }}
+          onEachFeature={onEachDataset} />
+      )}
+
+      {/* Heatmap */}
+      {heatmapOn && geoData.dataset && (
+        <HeatmapLayer data={geoData.dataset} radius={heatmapRadius} />
+      )}
+
       {/* Buffers */}
       {LAYERS.filter(l => l.buffer).map(layer =>
         BUFFER_DISTANCES.map(dist => {

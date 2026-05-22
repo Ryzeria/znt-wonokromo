@@ -3,7 +3,7 @@ import {
   Plus, Minus, Home, Maximize2, Minimize2,
   LocateFixed, Ruler, SquareDashed, Trash2,
   Map, Search, Download, Share2, HelpCircle, Info,
-  Sun, Moon, Globe, Layers
+  Sun, Moon, Globe, Layers, Box
 } from 'lucide-react'
 
 /* ─── Divider ───────────────────────────────────────── */
@@ -40,7 +40,8 @@ export default function Toolbar({
   isFullscreen, setIsFullscreen,
   onOpenModal, isLeftOpen, setIsLeftOpen,
   measureResult, onClearMeasure,
-  theme, toggleTheme, language, toggleLanguage
+  theme, toggleTheme, language, toggleLanguage,
+  show3D, onToggle3D
 }) {
   const map = mapRef?.current
 
@@ -105,6 +106,9 @@ export default function Toolbar({
           <Btn icon={Layers} label={t.layers}      active={isLeftOpen} onClick={() => setIsLeftOpen(p => !p)} />
           <Btn icon={Map}    label={t.basemap}                          onClick={() => onOpenModal('basemap')} />
           <Btn icon={Search} label={t.findLocation}                     onClick={() => onOpenModal('find')} />
+          {onToggle3D && (
+            <Btn icon={Box} label="3D View" active={show3D} onClick={onToggle3D} />
+          )}
         </Group>
 
         <Divider />
