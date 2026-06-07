@@ -69,13 +69,14 @@ export function filterKolektor(geojson) {
 /* ─── Popup builders ─────────────────────────────────── */
 export function popupZNT(p, t) {
   const s = ZNT_STYLE[p.zona_id]
+  const fmtRp = (v) => v > 0 ? formatRupiah(v) : '–'
   return `<div class="pp-card">
     <div class="pp-head" style="background:${s?.fill||'#eee'};border-bottom:2px solid ${s?.stroke||'#ccc'}">
       <span class="pp-title">${p.zona_lbl || '-'}</span>
     </div>
     <div class="pp-body">
-      <div class="pp-row"><span>${t.hargaLGB}</span><b>${formatRupiah(p.harga_lgb)}/m²</b></div>
-      <div class="pp-row"><span>${t.hargaWO}</span><b>${formatRupiah(p.harga_wo)}/m²</b></div>
+      <div class="pp-row"><span>Harga Min</span><b>${fmtRp(p.harga_min)}/m²</b></div>
+      <div class="pp-row"><span>Harga Maks</span><b>${fmtRp(p.harga_max)}/m²</b></div>
       <div class="pp-row"><span>${t.ahpScore}</span><b>${formatNumber(p.ahp_scr)}</b></div>
       <div class="pp-row"><span>${t.lgbScore}</span><b>${formatNumber(p.lgb_scr)}</b></div>
       <div class="pp-row"><span>${t.finalScore}</span><b>${formatNumber(p.score)}</b></div>

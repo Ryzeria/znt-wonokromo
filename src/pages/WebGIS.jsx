@@ -85,40 +85,46 @@ export default function WebGIS() {
   return (
     <div className={`fixed inset-0 flex flex-col ${theme === 'dark' ? 'dark' : ''}`} style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
 
-      {/* ── Header ── */}
-      <header className="flex-shrink-0 h-12 bg-white border-b border-slate-200 flex items-center px-4 gap-4 z-[500] shadow-sm">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <a href="/" className="flex items-center gap-2 group flex-shrink-0">
-            <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center p-1 group-hover:border-blue-300 transition-colors">
-              <img src={`${BASE}assets/logo.svg`} alt="Logo" className="w-full h-full object-contain"
-                onError={e => { e.target.src = `${BASE}assets/logo.png` }} />
-            </div>
-          </a>
-          <div className="min-w-0">
-            <h1 className="text-slate-900 font-semibold text-sm leading-tight truncate">{t.title}</h1>
-            <p className="text-slate-400 text-[10px] leading-none truncate hidden sm:block">{t.subtitle}</p>
+      {/* ── Header — matches NavBar layout: Logo | Badges | [spacer] | Links ── */}
+      <header className="flex-shrink-0 h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-4 z-[500] shadow-sm">
+        {/* Logo + title (same as NavBar) */}
+        <a href="/" className="flex items-center gap-2.5 flex-shrink-0 group">
+          <div className="w-7 h-7 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center p-1 group-hover:border-blue-300 transition-colors">
+            <img src={`${BASE}assets/logo.svg`} alt="Logo" className="w-full h-full object-contain"
+              onError={e => { e.target.src = `${BASE}assets/logo.png` }} />
           </div>
-        </div>
+          <div className="hidden sm:block">
+            <p className="text-slate-900 font-semibold text-sm leading-none">{t.title}</p>
+            <p className="text-slate-400 text-[10px] leading-none mt-0.5">{t.subtitle}</p>
+          </div>
+        </a>
 
-        {/* Page links */}
-        <div className="hidden md:flex items-center gap-0.5">
-          {[{ href: '/', label: 'Beranda' }, { href: '/storymap', label: 'StoryMap' }, { href: '/dashboard', label: 'Dashboard' }].map(({ href, label }) => (
-            <a key={href} href={href}
-              className="px-2.5 py-1 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition-colors">
-              {label}
-            </a>
-          ))}
-        </div>
-
-        <div className="hidden lg:flex items-center gap-1.5 flex-shrink-0">
+        {/* Badges — right after logo (same position as NavBar) */}
+        <div className="hidden xl:flex items-center gap-1.5">
           {['LightGBM', 'AHP', 'GIS'].map(b => (
             <span key={b} className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-[10px] font-medium border border-blue-100">{b}</span>
           ))}
         </div>
 
-        <div className="hidden sm:flex flex-col items-end flex-shrink-0">
-          <span className="text-slate-400 text-[9px] leading-tight">Kec. Wonokromo</span>
-          <span className="text-slate-400 text-[9px] leading-tight">Kota Surabaya</span>
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Nav links — always on right (same as NavBar) */}
+        <div className="flex items-center gap-0.5">
+          {[
+            { href: '/', label: 'Beranda' },
+            { href: '/storymap', label: 'StoryMap' },
+            { href: '/dashboard', label: 'Dashboard' },
+          ].map(({ href, label }) => (
+            <a key={href} href={href}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-medium transition-colors">
+              {label}
+            </a>
+          ))}
+          {/* Active: WebGIS */}
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium">
+            WebGIS
+          </span>
         </div>
       </header>
 
