@@ -1,6 +1,47 @@
 import { useState } from 'react'
-import { Layers, Eye, EyeOff, X, Flame, Circle, Filter, Search, SlidersHorizontal, ChevronRight } from 'lucide-react'
+import { Layers, Eye, EyeOff, X, Flame, Circle, Filter, Search, SlidersHorizontal } from 'lucide-react'
 import { LAYERS, ZNT_STYLE, LULC_COLORS, BUFFER_COLORS, BUFFER_DISTANCES } from '../config'
+
+/* ─── Inline SVG icons for facility layers ─────────── */
+const FACILITY_ICONS = {
+  faskes: (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="white">
+      <rect x="4.5" y="0" width="3" height="12" rx="1"/>
+      <rect x="0" y="4.5" width="12" height="3" rx="1"/>
+    </svg>
+  ),
+  pendidikan: (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="white">
+      <path d="M6 1L0 4.5l6 3.5 6-3.5L6 1z"/>
+      <path d="M2 6v4l4 2 4-2V6" stroke="white" strokeWidth="1.4" fill="none" strokeLinejoin="round"/>
+    </svg>
+  ),
+  cbd: (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="white">
+      <rect x="2" y="3.5" width="8" height="8.5" rx="0.5"/>
+      <path d="M1.5 3.5L6 0.5l4.5 3" fill="white"/>
+      <rect x="3.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/>
+      <rect x="6.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/>
+      <rect x="5" y="9.5" width="2" height="2.5" fill="#7c3aed"/>
+    </svg>
+  ),
+  pasar: (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="white">
+      <path d="M1.5 4.5h9l-1 7h-7l-1-7z"/>
+      <path d="M4 4.5V3a2 2 0 014 0v1.5" fill="none" stroke="white" strokeWidth="1.4"/>
+    </svg>
+  ),
+  transportasi: (
+    <svg width="11" height="11" viewBox="0 0 12 12" fill="white">
+      <rect x="1" y="1.5" width="10" height="7" rx="1.5"/>
+      <rect x="2.5" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/>
+      <rect x="7" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/>
+      <circle cx="3" cy="10.5" r="1.2"/>
+      <circle cx="9" cy="10.5" r="1.2"/>
+      <rect x="4" y="9.8" width="4" height="1.4" rx="0.5"/>
+    </svg>
+  ),
+}
 
 /* ─── Tab ────────────────────────────────────────────── */
 function Tab({ active, onClick, children }) {
@@ -17,10 +58,16 @@ function Tab({ active, onClick, children }) {
 /* ─── Layer item ─────────────────────────────────────── */
 function LayerItem({ layer, visible, onToggle, opacity, onSetOpacity, activeBuffers, onToggleBuffer, language }) {
   const label = language === 'en' ? layer.labelEn : layer.label
+  const hasIcon = !!FACILITY_ICONS[layer.id]
   return (
     <div className="rounded-lg hover:bg-slate-50 transition-colors px-2 py-2">
       <div className="flex items-center gap-2">
-        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-black/10" style={{ background: layer.color }} />
+        {hasIcon
+          ? <div className="w-4.5 h-4.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center ring-1 ring-black/10" style={{ background: layer.color }}>
+              {FACILITY_ICONS[layer.id]}
+            </div>
+          : <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-black/10" style={{ background: layer.color }} />
+        }
         <span className={`flex-1 text-xs leading-tight min-w-0 truncate ${
           visible ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
         <button onClick={onToggle}
@@ -73,6 +120,17 @@ function Dot({ color, label }) {
   return (
     <div className="flex items-center gap-2.5">
       <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 border-white shadow-sm" style={{ background: color }} />
+      <span className="text-[11px] text-slate-500">{label}</span>
+    </div>
+  )
+}
+function FacilityDot({ layerId, color, label }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-white shadow-sm flex-shrink-0"
+        style={{ background: color }}>
+        {FACILITY_ICONS[layerId]}
+      </div>
       <span className="text-[11px] text-slate-500">{label}</span>
     </div>
   )
@@ -279,6 +337,19 @@ export default function SidePanel({
                     <Dot color="#059669" label="< Rp 5 juta/m²" />
                     <Dot color="#2563eb" label="Rp 5–20 juta/m²" />
                     <Dot color="#dc2626" label="> Rp 20 juta/m²" />
+                  </div>
+                </div>
+              )}
+              {/* ── Fasilitas (icon-based) ── */}
+              {(visibleLayers.faskes || visibleLayers.pendidikan || visibleLayers.cbd || visibleLayers.pasar || visibleLayers.transportasi) && (
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Fasilitas</p>
+                  <div className="space-y-1.5">
+                    {visibleLayers.faskes       && <FacilityDot layerId="faskes"       color="#e11d48" label={language === 'en' ? 'Health Facility' : 'Fasilitas Kesehatan'} />}
+                    {visibleLayers.pendidikan   && <FacilityDot layerId="pendidikan"   color="#d97706" label={language === 'en' ? 'Education Facility' : 'Fasilitas Pendidikan'} />}
+                    {visibleLayers.cbd          && <FacilityDot layerId="cbd"          color="#7c3aed" label={language === 'en' ? 'Central Business District' : 'Pusat Bisnis (CBD)'} />}
+                    {visibleLayers.pasar        && <FacilityDot layerId="pasar"        color="#ea580c" label={language === 'en' ? 'Market' : 'Pasar'} />}
+                    {visibleLayers.transportasi && <FacilityDot layerId="transportasi" color="#0891b2" label={language === 'en' ? 'Transportation' : 'Transportasi'} />}
                   </div>
                 </div>
               )}

@@ -202,7 +202,7 @@ export default function WebGIS() {
         <span className="hidden sm:block">WGS 84 / EPSG:4326</span>
         <span className="flex-1" />
         <span className="hidden md:block">© OSM · Esri · CartoDB</span>
-        <span>ZNT Wonokromo 2024</span>
+        <span>ZNT Wonokromo 2026</span>
       </footer>
 
       <Modals

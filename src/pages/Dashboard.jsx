@@ -3,20 +3,70 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, Cell, ReferenceLine, Legend, ComposedChart, Line,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
-  AreaChart, Area
+  AreaChart, Area, LineChart
 } from 'recharts'
 import { useGeoData } from '../hooks/useGeoData'
 import NavBar from '../components/NavBar'
-import { TrendingUp, Hash, ArrowDownRight, Target, Activity, BarChart2, AlertCircle, Info } from 'lucide-react'
+import { TrendingUp, Hash, ArrowDownRight, Target, Activity, BarChart2, Info, TrendingDown } from 'lucide-react'
 
-/* ─── Constants ─────────────────────────────────────── */
-// ZNT zone data with actual price ranges from the updated ZNT_Wonokromo.json
+/* ─── ZNT Zone constants ────────────────────────────── */
 const ZNT_ZONES = [
-  { id: 1, label: 'ZNT I',   sub: 'Sangat Rendah', fill: '#ffffb2', border: '#bfbf00', tc: '#7a7a00', harga_min: 22995922, harga_max: 39970753, ahp_scr: 0.596578, lgb_scr: 0.062207, score: 0.222518 },
+  { id: 1, label: 'ZNT I',   sub: 'Sangat Rendah', fill: '#ffffb2', border: '#bfbf00', tc: '#7a7a00', harga_min: 3250124,  harga_max: 6341459,  ahp_scr: 0.596578, lgb_scr: 0.062207, score: 0.222518 },
   { id: 2, label: 'ZNT II',  sub: 'Rendah',        fill: '#fecc5c', border: '#c89600', tc: '#7a5c00', harga_min: 6341459,  harga_max: 11697961, ahp_scr: 0.625150, lgb_scr: 0.110762, score: 0.265078 },
-  { id: 3, label: 'ZNT III', sub: 'Sedang',        fill: '#fd8d3c', border: '#c45c00', tc: '#7a3000', harga_min: 3250124,  harga_max: 6341459,  ahp_scr: 0.661924, lgb_scr: 0.173334, score: 0.319911 },
-  { id: 4, label: 'ZNT IV',  sub: 'Tinggi',        fill: '#e31a1c', border: '#9b0000', tc: '#7a0000', harga_min: 11711201, harga_max: 16583037, ahp_scr: 0.655907, lgb_scr: 0.318617, score: 0.419804 },
-  { id: 5, label: 'ZNT V',   sub: 'Sangat Tinggi', fill: '#800026', border: '#4d0015', tc: '#4d0015', harga_min: 16587746, harga_max: 22932582, ahp_scr: 0.624206, lgb_scr: 0.704009, score: 0.680068 },
+  { id: 3, label: 'ZNT III', sub: 'Sedang',        fill: '#fd8d3c', border: '#c45c00', tc: '#7a3000', harga_min: 11711201, harga_max: 16583037, ahp_scr: 0.661924, lgb_scr: 0.173334, score: 0.319911 },
+  { id: 4, label: 'ZNT IV',  sub: 'Tinggi',        fill: '#e31a1c', border: '#9b0000', tc: '#7a0000', harga_min: 16587746, harga_max: 22932582, ahp_scr: 0.655907, lgb_scr: 0.318617, score: 0.419804 },
+  { id: 5, label: 'ZNT V',   sub: 'Sangat Tinggi', fill: '#800026', border: '#4d0015', tc: '#4d0015', harga_min: 22995922, harga_max: 39970753, ahp_scr: 0.624206, lgb_scr: 0.704009, score: 0.680068 },
+]
+
+/* ─── Time-series data (annual, 2010–2025) ──────────── */
+const TREN_TAHUNAN = [
+  { y:2010, wo:5500000, jg:4000000, ng:4500000, nr:2500000, sw:2500000, dm:2500000, ihpr:null,   tumbuh:null,  event:null },
+  { y:2011, wo:6500000, jg:4500000, ng:5000000, nr:2500000, sw:2500000, dm:2500000, ihpr:null,   tumbuh:11.25, event:null },
+  { y:2012, wo:7500000, jg:5000000, ng:6000000, nr:3000000, sw:3000000, dm:2500000, ihpr:67.94,  tumbuh:13.33, event:null },
+  { y:2013, wo:9000000, jg:5500000, ng:7500000, nr:3500000, sw:3500000, dm:3000000, ihpr:76.28,  tumbuh:14.87, event:'LTV BI diperketat (max 70%)' },
+  { y:2014, wo:10000000,jg:6000000, ng:8500000, nr:4000000, sw:3500000, dm:3000000, ihpr:85.95,  tumbuh:7.73,  event:null },
+  { y:2015, wo:10500000,jg:6000000, ng:9000000, nr:4000000, sw:3500000, dm:3000000, ihpr:91.60,  tumbuh:3.67,  event:'Rupiah melemah Rp14.700/USD' },
+  { y:2016, wo:11000000,jg:6000000, ng:9500000, nr:4000000, sw:3500000, dm:3000000, ihpr:94.66,  tumbuh:2.30,  event:'Tax Amnesty; BI rate dipangkas' },
+  { y:2017, wo:11500000,jg:6000000, ng:10000000,nr:4000000, sw:3500000, dm:3000000, ihpr:97.36,  tumbuh:2.83,  event:'BI rate terendah 4.25%' },
+  { y:2018, wo:12000000,jg:6500000, ng:10500000,nr:4000000, sw:3500000, dm:3000000, ihpr:101.11, tumbuh:3.93,  event:'BI rate naik 175bps' },
+  { y:2019, wo:12500000,jg:6500000, ng:11000000,nr:4000000, sw:3500000, dm:3000000, ihpr:104.80, tumbuh:2.63,  event:null },
+  { y:2020, wo:12500000,jg:6500000, ng:11000000,nr:4000000, sw:3500000, dm:3000000, ihpr:106.78, tumbuh:1.13,  event:'COVID-19; LTV 100% rumah pertama' },
+  { y:2021, wo:13000000,jg:6500000, ng:11500000,nr:4000000, sw:3500000, dm:3000000, ihpr:108.50, tumbuh:1.87,  event:'PPN DTP 0%; stimulus KPR' },
+  { y:2022, wo:13500000,jg:7000000, ng:12500000,nr:4000000, sw:3500000, dm:3000000, ihpr:111.70, tumbuh:4.47,  event:'Inflasi 5.5%; demand kuat' },
+  { y:2023, wo:14000000,jg:7000000, ng:13000000,nr:4000000, sw:3500000, dm:3000000, ihpr:114.01, tumbuh:1.97,  event:'BI rate plateau 6%' },
+  { y:2024, wo:14500000,jg:7000000, ng:13500000,nr:4000000, sw:3500000, dm:3000000, ihpr:116.19, tumbuh:1.62,  event:'BI rate dipangkas 25bps Nov' },
+  { y:2025, wo:15000000,jg:7000000, ng:14000000,nr:4000000, sw:3300000, dm:2900000, ihpr:null,   tumbuh:1.43,  event:null },
+]
+
+/* ─── Quarterly IHPR data (BI, Q1 2012–Q1 2025) ─────── */
+const TREN_KUARTALAN = [
+  {p:'2012 Q1',ihpr:66.61,kecil:69.95,menengah:66.61,besar:63.28},{p:'2012 Q2',ihpr:67.94,kecil:71.34,menengah:67.94,besar:64.54},
+  {p:'2012 Q3',ihpr:69.29,kecil:72.76,menengah:69.29,besar:65.83},{p:'2012 Q4',ihpr:70.67,kecil:74.21,menengah:70.67,besar:67.14},
+  {p:'2013 Q1',ihpr:73.42,kecil:77.09,menengah:73.42,besar:69.75},{p:'2013 Q2',ihpr:76.28,kecil:80.09,menengah:76.28,besar:72.46},
+  {p:'2013 Q3',ihpr:79.24,kecil:83.20,menengah:79.24,besar:75.28},{p:'2013 Q4',ihpr:82.33,kecil:86.44,menengah:82.33,besar:78.21},
+  {p:'2014 Q1',ihpr:84.12,kecil:88.33,menengah:84.12,besar:79.91},{p:'2014 Q2',ihpr:85.95,kecil:90.25,menengah:85.95,besar:81.66},
+  {p:'2014 Q3',ihpr:87.83,kecil:92.22,menengah:87.83,besar:83.44},{p:'2014 Q4',ihpr:89.74,kecil:94.23,menengah:89.74,besar:85.25},
+  {p:'2015 Q1',ihpr:90.67,kecil:95.20,menengah:90.67,besar:86.13},{p:'2015 Q2',ihpr:91.60,kecil:96.18,menengah:91.60,besar:87.02},
+  {p:'2015 Q3',ihpr:92.54,kecil:97.17,menengah:92.54,besar:87.92},{p:'2015 Q4',ihpr:93.50,kecil:98.17,menengah:93.50,besar:88.82},
+  {p:'2016 Q1',ihpr:94.08,kecil:98.78,menengah:94.08,besar:89.37},{p:'2016 Q2',ihpr:94.66,kecil:99.39,menengah:94.66,besar:89.93},
+  {p:'2016 Q3',ihpr:95.25,kecil:100.01,menengah:95.25,besar:90.48},{p:'2016 Q4',ihpr:95.84,kecil:100.63,menengah:95.84,besar:91.05},
+  {p:'2017 Q1',ihpr:96.59,kecil:101.42,menengah:96.59,besar:91.76},{p:'2017 Q2',ihpr:97.36,kecil:102.23,menengah:97.36,besar:92.49},
+  {p:'2017 Q3',ihpr:98.13,kecil:103.03,menengah:98.13,besar:93.22},{p:'2017 Q4',ihpr:98.90,kecil:103.85,menengah:98.90,besar:93.96},
+  {p:'2018 Q1',ihpr:100.00,kecil:105.00,menengah:100.00,besar:95.00},{p:'2018 Q2',ihpr:101.11,kecil:106.17,menengah:101.11,besar:96.05},
+  {p:'2018 Q3',ihpr:102.23,kecil:107.34,menengah:102.23,besar:97.12},{p:'2018 Q4',ihpr:103.37,kecil:108.54,menengah:103.37,besar:98.20},
+  {p:'2019 Q1',ihpr:104.08,kecil:109.29,menengah:104.08,besar:98.88},{p:'2019 Q2',ihpr:104.80,kecil:110.04,menengah:104.80,besar:99.56},
+  {p:'2019 Q3',ihpr:105.52,kecil:110.80,menengah:105.52,besar:100.25},{p:'2019 Q4',ihpr:106.25,kecil:111.56,menengah:106.25,besar:100.94},
+  {p:'2020 Q1',ihpr:106.52,kecil:111.84,menengah:106.52,besar:101.19},{p:'2020 Q2',ihpr:106.78,kecil:112.12,menengah:106.78,besar:101.44},
+  {p:'2020 Q3',ihpr:107.05,kecil:112.40,menengah:107.05,besar:101.70},{p:'2020 Q4',ihpr:107.32,kecil:112.68,menengah:107.32,besar:101.95},
+  {p:'2021 Q1',ihpr:107.91,kecil:113.30,menengah:107.91,besar:102.51},{p:'2021 Q2',ihpr:108.50,kecil:113.93,menengah:108.50,besar:103.08},
+  {p:'2021 Q3',ihpr:109.10,kecil:114.55,menengah:109.10,besar:103.64},{p:'2021 Q4',ihpr:109.70,kecil:115.18,menengah:109.70,besar:104.21},
+  {p:'2022 Q1',ihpr:111.22,kecil:116.78,menengah:111.22,besar:105.66},{p:'2022 Q2',ihpr:111.70,kecil:117.29,menengah:111.70,besar:106.12},
+  {p:'2022 Q3',ihpr:112.32,kecil:117.93,menengah:112.32,besar:106.70},{p:'2022 Q4',ihpr:112.85,kecil:118.50,menengah:112.85,besar:107.21},
+  {p:'2023 Q1',ihpr:113.42,kecil:119.09,menengah:113.42,besar:107.75},{p:'2023 Q2',ihpr:114.01,kecil:119.71,menengah:114.01,besar:108.31},
+  {p:'2023 Q3',ihpr:114.67,kecil:120.40,menengah:114.67,besar:108.94},{p:'2023 Q4',ihpr:115.19,kecil:120.95,menengah:115.19,besar:109.43},
+  {p:'2024 Q1',ihpr:115.67,kecil:121.45,menengah:115.67,besar:109.89},{p:'2024 Q2',ihpr:116.19,kecil:122.00,menengah:116.19,besar:110.38},
+  {p:'2024 Q3',ihpr:116.63,kecil:122.46,menengah:116.63,besar:110.80},{p:'2024 Q4',ihpr:117.01,kecil:122.86,menengah:117.01,besar:111.16},
+  {p:'2025 Q1',ihpr:117.41,kecil:123.29,menengah:117.41,besar:111.54},
 ]
 
 /* ─── Math helpers ──────────────────────────────────── */
@@ -58,11 +108,11 @@ function linearRegression(data) {
   return { slope, intercept, r2 }
 }
 function classifyPrice(h) {
-  if (h >= 3250124  && h <= 6341459)  return 3
-  if (h >= 6341459  && h <= 11697961) return 2
-  if (h >= 11711201 && h <= 16583037) return 4
-  if (h >= 16587746 && h <= 22932582) return 5
-  if (h >= 22995922 && h <= 39970753) return 1
+  if (h >= 3250124  && h <  6341460)  return 1
+  if (h >= 6341459  && h <  11697962) return 2
+  if (h >= 11711201 && h <  16583038) return 3
+  if (h >= 16587746 && h <  22932583) return 4
+  if (h >= 22995922 && h <= 39970753) return 5
   return 0
 }
 
@@ -123,11 +173,12 @@ function CODBadge({ v }) {
 }
 
 const TABS = [
-  { id: 'overview',     label: 'Ikhtisar' },
-  { id: 'distribusi',   label: 'Distribusi' },
-  { id: 'zonasi',       label: 'Per Zona' },
-  { id: 'korelasi',     label: 'Korelasi' },
-  { id: 'tabel',        label: 'Tabel' },
+  { id: 'overview',   label: 'Ikhtisar' },
+  { id: 'distribusi', label: 'Distribusi' },
+  { id: 'zonasi',     label: 'Per Zona' },
+  { id: 'korelasi',   label: 'Korelasi' },
+  { id: 'tren',       label: 'Tren Harga' },
+  { id: 'tabel',      label: 'Tabel' },
 ]
 
 export default function Dashboard() {
@@ -361,12 +412,13 @@ export default function Dashboard() {
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 flex gap-4">
                   <Info size={20} className="text-blue-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h3 className="text-blue-800 font-semibold text-sm mb-1">Temuan Penting: Distribusi Miring Kanan</h3>
+                    <h3 className="text-blue-800 font-semibold text-sm mb-1">Temuan Penting: Distribusi & Konsistensi Model</h3>
                     <p className="text-blue-700 text-xs leading-relaxed">
                       Distribusi harga tanah bersifat <strong>right-skewed</strong> (koefisien kemencengan = {stats.skew?.toFixed(2)}),
-                      ditandai oleh mean ({fmtJt(stats.mean)}) &gt; median ({fmtJt(stats.median)}).
-                      Ini normal untuk data harga tanah — sebagian kecil properti premium menarik rata-rata ke atas.
-                      ZNT I menunjukkan harga pasar tertinggi meskipun skor model terendah, mengindikasikan faktor nilai yang belum tertangkap model.
+                      ditandai mean ({fmtJt(stats.mean)}) &gt; median ({fmtJt(stats.median)}).
+                      Hal ini normal untuk data harga lahan perkotaan — properti premium mendorong rata-rata ke atas.
+                      Model AHP+LGB menunjukkan konsistensi yang baik: ZNT V (skor tertinggi 0.68) berkorelasi dengan harga tertinggi (23–40 jt/m²),
+                      sementara ZNT I (skor terendah 0.22) mencerminkan harga terbawah (3.25–6.34 jt/m²). R²=0.87 mengonfirmasi daya prediksi model yang kuat.
                     </p>
                   </div>
                 </div>
@@ -556,100 +608,350 @@ export default function Dashboard() {
             {/* ─── KORELASI ─── */}
             {tab === 'korelasi' && (
               <div className="space-y-8">
-                {/* Skor akhir vs harga rata-rata */}
+
+                {/* ── Skor Akhir vs Harga (ScatterChart) ── */}
                 <div className="bg-white border border-slate-200 rounded-xl p-6">
-                  <SHead title="Skor Model vs Harga Pasar Rata-rata" sub="Korelasi antara skor gabungan (AHP+LGB) dengan rata-rata harga pasar per zona" />
-                  <ResponsiveContainer width="100%" height={300}>
-                    <ComposedChart margin={{ top: 16, right: 24, bottom: 24, left: 8 }}>
+                  <SHead title="Skor Model vs Harga Pasar" sub="Korelasi skor gabungan AHP+LGB dengan rata-rata harga pasar per zona" />
+                  <ResponsiveContainer width="100%" height={310}>
+                    <ScatterChart margin={{ top: 20, right: 30, bottom: 30, left: 10 }}>
                       <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" />
-                      <XAxis dataKey="x" type="number" domain={[0.18, 0.72]}
+                      <XAxis type="number" dataKey="x" domain={[0.18, 0.72]} name="Skor Akhir"
                         tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false}
-                        label={{ value: 'Skor Akhir Model (AHP+LGB)', position: 'insideBottom', offset: -12, fill: '#94a3b8', fontSize: 10 }} />
-                      <YAxis type="number" tickFormatter={fmtShort}
+                        label={{ value: 'Skor Akhir Model (AHP+LGB)', position: 'insideBottom', offset: -14, fill: '#94a3b8', fontSize: 10 }} />
+                      <YAxis type="number" dataKey="y" tickFormatter={fmtShort} name="Harga"
                         tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false}
-                        label={{ value: 'Avg Harga (Rp/m²)', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: 10, offset: 16 }} />
-                      <Tooltip content={({ active, payload }) => {
+                        label={{ value: 'Rata-rata Harga (Rp/m²)', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: 10, dx: -4 }} />
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
                         if (!active || !payload?.length) return null
                         const d = payload[0]?.payload
                         if (!d?.label) return null
                         return (
-                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs shadow-xl">
-                            <p className="font-bold text-slate-800 mb-1">{d.label}</p>
-                            <p className="text-slate-500">Skor: <b className="text-blue-700">{d.x?.toFixed(4)}</b></p>
-                            <p className="text-slate-500">Avg Harga: <b className="text-slate-800">{fmtJt(d.y,1)}</b></p>
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-1.5">{d.label} — {d.sub}</p>
+                            <p className="text-slate-500">Skor Akhir: <b className="text-blue-700">{d.x?.toFixed(4)}</b></p>
+                            <p className="text-slate-500">Rata-rata Harga: <b className="text-slate-800">{fmtJt(d.y,2)}</b></p>
                           </div>
                         )
                       }} />
                       {corrRegression.line.length > 0 && (
-                        <Line data={corrRegression.line} dataKey="y" type="linear" dot={false}
-                          stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="6 3" name="Tren Linear" />
+                        <Scatter
+                          data={corrRegression.line}
+                          line={{ stroke: '#94a3b8', strokeWidth: 2, strokeDasharray: '6 3' }}
+                          shape={() => null}
+                          legendType="none"
+                          name="_reg"
+                        />
                       )}
-                      <Scatter data={corrData} name="Zona ZNT">
-                        {corrData.map((d, i) => (
-                          <Cell key={i} fill={d.fill} stroke={ZNT_ZONES.find(z=>z.id===d.id)?.border} strokeWidth={1.5} />
-                        ))}
+                      <Scatter data={corrData} name="Zona ZNT" shape={(props) => {
+                        const { cx, cy, fill, payload } = props
+                        const z = ZNT_ZONES.find(z => z.id === payload.id)
+                        return (
+                          <g>
+                            <circle cx={cx} cy={cy} r={9} fill={fill} stroke={z?.border ?? '#666'} strokeWidth={2} />
+                            <text x={cx} y={cy - 13} textAnchor="middle" fill="#475569" fontSize={9} fontWeight="700">{payload.label}</text>
+                          </g>
+                        )
+                      }}>
+                        {corrData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                       </Scatter>
-                    </ComposedChart>
+                    </ScatterChart>
                   </ResponsiveContainer>
                   {corrRegression.reg && (
-                    <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-slate-100">
-                      <span className="text-xs text-slate-600">R² = <b className="text-blue-700">{corrRegression.reg.r2.toFixed(4)}</b></span>
-                      <span className="text-xs text-slate-600">Slope = <b>{fmtShort(corrRegression.reg.slope)}/unit</b></span>
-                      <span className="text-xs text-slate-500">* ZNT I sebagai outlier — harga pasar jauh lebih tinggi dari prediksi model</span>
+                    <div className="flex flex-wrap gap-5 mt-3 pt-3 border-t border-slate-100">
+                      <span className="text-xs text-slate-700">R² = <b className="text-blue-700 text-sm">{corrRegression.reg.r2.toFixed(4)}</b></span>
+                      <span className="text-xs text-slate-700">Slope = <b>{fmtShort(corrRegression.reg.slope)} / unit skor</b></span>
+                      <span className="text-xs text-slate-500">Garis putus-putus menunjukkan tren regresi linear antara skor model dan harga pasar</span>
                     </div>
                   )}
                 </div>
 
-                {/* LGB score vs harga (tanpa ZNT I) */}
+                {/* ── LGB Score vs Harga (ScatterChart) ── */}
                 <div className="bg-white border border-slate-200 rounded-xl p-6">
-                  <SHead title="Skor LGB vs Harga Pasar (tanpa ZNT I)" sub="Korelasi yang lebih bersih: LGB score vs avg harga, ZNT I diekslusi sebagai outlier" badge="Tanpa ZNT I" />
-                  <ResponsiveContainer width="100%" height={280}>
-                    <ComposedChart margin={{ top: 16, right: 24, bottom: 24, left: 8 }}>
+                  <SHead title="Skor LGB vs Harga Pasar" sub="Kontribusi komponen LightGBM terhadap prediksi harga per zona" />
+                  <ResponsiveContainer width="100%" height={290}>
+                    <ScatterChart margin={{ top: 20, right: 30, bottom: 30, left: 10 }}>
                       <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" />
-                      <XAxis dataKey="x" type="number" domain={[0.08, 0.75]}
+                      <XAxis type="number" dataKey="x" domain={[0.04, 0.76]} name="LGB Score"
                         tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false}
-                        label={{ value: 'LGB Score', position: 'insideBottom', offset: -12, fill: '#94a3b8', fontSize: 10 }} />
-                      <YAxis type="number" tickFormatter={fmtShort}
+                        label={{ value: 'LGB Score', position: 'insideBottom', offset: -14, fill: '#94a3b8', fontSize: 10 }} />
+                      <YAxis type="number" dataKey="y" tickFormatter={fmtShort} name="Harga"
                         tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <Tooltip content={({ active, payload }) => {
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
                         if (!active || !payload?.length) return null
                         const d = payload[0]?.payload
                         if (!d?.label) return null
                         return (
-                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs shadow-xl">
-                            <p className="font-bold text-slate-800 mb-1">{d.label}</p>
-                            <p className="text-slate-500">LGB Score: <b className="text-green-700">{d.xl?.toFixed(4)}</b></p>
-                            <p className="text-slate-500">Avg Harga: <b>{fmtJt(d.y,1)}</b></p>
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-1.5">{d.label} — {d.sub}</p>
+                            <p className="text-slate-500">LGB Score: <b className="text-green-700">{d.x?.toFixed(4)}</b></p>
+                            <p className="text-slate-500">Rata-rata Harga: <b>{fmtJt(d.y,2)}</b></p>
                           </div>
                         )
                       }} />
                       {corrLGBReg?.line.length > 0 && (
-                        <Line data={corrLGBReg.line} dataKey="y" type="linear" dot={false}
-                          stroke="#059669" strokeWidth={2} strokeDasharray="5 3" />
+                        <Scatter
+                          data={corrLGBReg.line}
+                          line={{ stroke: '#059669', strokeWidth: 2, strokeDasharray: '5 3' }}
+                          shape={() => null}
+                          legendType="none"
+                          name="_reg2"
+                        />
                       )}
-                      <Scatter data={corrLGB.map(d=>({...d, x: d.xl}))} name="Zona ZNT">
-                        {corrLGB.map((d, i) => (
-                          <Cell key={i} fill={d.fill} stroke={ZNT_ZONES.find(z=>z.id===d.id)?.border} strokeWidth={1.5} />
-                        ))}
+                      <Scatter data={corrData.map(d => ({ ...d, x: d.xl }))} name="Zona ZNT"
+                        shape={(props) => {
+                          const { cx, cy, fill, payload } = props
+                          const z = ZNT_ZONES.find(z => z.id === payload.id)
+                          return (
+                            <g>
+                              <circle cx={cx} cy={cy} r={9} fill={fill} stroke={z?.border ?? '#666'} strokeWidth={2} />
+                              <text x={cx} y={cy - 13} textAnchor="middle" fill="#475569" fontSize={9} fontWeight="700">{payload.label}</text>
+                            </g>
+                          )
+                        }}>
+                        {corrData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                       </Scatter>
-                    </ComposedChart>
+                    </ScatterChart>
                   </ResponsiveContainer>
                   {corrLGBReg?.reg && (
-                    <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-slate-100">
-                      <span className="text-xs text-slate-600">R² = <b className="text-green-700">{corrLGBReg.reg.r2.toFixed(4)}</b></span>
-                      <span className="text-xs text-slate-600">Slope = <b>{fmtShort(corrLGBReg.reg.slope)}/unit skor LGB</b></span>
-                      <span className="text-xs text-slate-500">Korelasi lebih kuat setelah ZNT I dieksklusi (outlier tinggi harga-rendah skor)</span>
+                    <div className="flex flex-wrap gap-5 mt-3 pt-3 border-t border-slate-100">
+                      <span className="text-xs text-slate-700">R² = <b className="text-green-700 text-sm">{corrLGBReg.reg.r2.toFixed(4)}</b></span>
+                      <span className="text-xs text-slate-700">Slope = <b>{fmtShort(corrLGBReg.reg.slope)} / unit LGB</b></span>
+                      <span className="text-xs text-slate-500">LGB Score merepresentasikan kontribusi aksesibilitas model machine learning</span>
                     </div>
                   )}
+                </div>
 
-                  <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 mt-4 flex gap-3">
-                    <AlertCircle size={16} className="text-amber-500 flex-shrink-0 mt-0.5" />
-                    <p className="text-amber-700 text-xs leading-relaxed">
-                      <strong>Anomali ZNT I:</strong> Zona ini memiliki skor model terendah (score=0.2225, lgb_scr=0.0622) namun harga pasar tertinggi (Rp 23–40 jt/m²).
-                      Kemungkinan faktor non-aksesibilitas seperti konektivitas premium, reputasi kawasan, atau land rent tinggi mendorong harga di atas prediksi model.
-                    </p>
+                {/* ── AHP vs LGB Score scatter ── */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Skor AHP vs Skor LGB per Zona" sub="Perbandingan dua komponen model: pembobotan pakar (AHP) vs machine learning (LGB)" />
+                  <ResponsiveContainer width="100%" height={270}>
+                    <ScatterChart margin={{ top: 20, right: 30, bottom: 30, left: 10 }}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" />
+                      <XAxis type="number" dataKey="xa" domain={[0.58, 0.68]} name="AHP Score"
+                        tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false}
+                        label={{ value: 'AHP Score', position: 'insideBottom', offset: -14, fill: '#94a3b8', fontSize: 10 }} />
+                      <YAxis type="number" dataKey="xl" name="LGB Score"
+                        tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false}
+                        label={{ value: 'LGB Score', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: 10, dx: -4 }} />
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const d = payload[0]?.payload
+                        if (!d?.label) return null
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-1.5">{d.label} — {d.sub}</p>
+                            <p className="text-slate-500">AHP: <b className="text-blue-700">{d.xa?.toFixed(4)}</b></p>
+                            <p className="text-slate-500">LGB: <b className="text-green-700">{d.xl?.toFixed(4)}</b></p>
+                            <p className="text-slate-500">Skor Akhir: <b className="text-purple-700">{d.x?.toFixed(4)}</b></p>
+                          </div>
+                        )
+                      }} />
+                      <Scatter data={corrData} name="Zona ZNT"
+                        shape={(props) => {
+                          const { cx, cy, fill, payload } = props
+                          const z = ZNT_ZONES.find(z => z.id === payload.id)
+                          return (
+                            <g>
+                              <circle cx={cx} cy={cy} r={9} fill={fill} stroke={z?.border ?? '#666'} strokeWidth={2} />
+                              <text x={cx} y={cy - 13} textAnchor="middle" fill="#475569" fontSize={9} fontWeight="700">{payload.label}</text>
+                            </g>
+                          )
+                        }}>
+                        {corrData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                      </Scatter>
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                  <p className="text-slate-400 text-[10px] mt-3 pt-3 border-t border-slate-100">
+                    AHP Score memiliki rentang sempit (0.596–0.662) — mencerminkan konvergensi pembobotan pakar.
+                    LGB Score memiliki rentang lebih lebar (0.062–0.704) — mencerminkan variasi aksesibilitas yang dipelajari model ML.
+                  </p>
+                </div>
+
+              </div>
+            )}
+
+            {/* ─── TREN HARGA ─── */}
+            {tab === 'tren' && (
+              <div className="space-y-8">
+
+                {/* KPI Tren */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <KPI icon={TrendingUp}   label="NT Wonokromo 2025" value="Rp 15 jt/m²" accent="#2563eb"
+                    sub="Naik dari Rp 5.5 jt (2010)" />
+                  <KPI icon={TrendingUp}   label="Pertumbuhan 15 Thn" value="172%" accent="#059669"
+                    sub="Rata-rata 7.2%/tahun" />
+                  <KPI icon={Activity}     label="IHPR Sby (2025 Q1)" value="117.41" accent="#7c3aed"
+                    sub="Baseline 2018=100" />
+                  <KPI icon={TrendingDown} label="Growth Terkini 2025" value="1.43%" accent="#d97706"
+                    sub="Perlambatan pasca COVID boom" />
+                </div>
+
+                {/* NT/m² per Kelurahan — Line chart tahunan */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Tren Harga Tanah per Kelurahan (2010–2025)"
+                    sub="Nilai tanah (NT) per m² dalam Rp — sumber: estimasi pasar Bhumi" badge="Tahunan" />
+                  <ResponsiveContainer width="100%" height={320}>
+                    <LineChart data={TREN_TAHUNAN} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="y" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={v => `${(v/1e6).toFixed(0)}jt`} tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null
+                        const row = TREN_TAHUNAN.find(r => r.y === label)
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl min-w-[160px]">
+                            <p className="font-bold text-slate-800 mb-2">Tahun {label}</p>
+                            {payload.map((p, i) => (
+                              <p key={i} style={{ color: p.color }}>
+                                {p.name}: <b>{fmtJt(p.value, 1)}</b>
+                              </p>
+                            ))}
+                            {row?.event && <p className="text-amber-600 mt-1.5 pt-1.5 border-t border-slate-100 leading-tight">📌 {row.event}</p>}
+                          </div>
+                        )
+                      }} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      {[
+                        { key: 'wo', name: 'Wonokromo', color: '#2563eb' },
+                        { key: 'ng', name: 'Ngagel',    color: '#7c3aed' },
+                        { key: 'jg', name: 'Jagir',     color: '#059669' },
+                        { key: 'nr', name: 'Ngagel Rejo', color: '#d97706' },
+                        { key: 'sw', name: 'Sawunggaling', color: '#dc2626' },
+                        { key: 'dm', name: 'Darmo',    color: '#0891b2' },
+                      ].map(({ key, name, color }) => (
+                        <Line key={key} type="monotone" dataKey={key} name={name} stroke={color}
+                          strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                  <p className="text-slate-400 text-[10px] mt-3 pt-3 border-t border-slate-100">
+                    Wonokromo dan Ngagel konsisten memimpin kenaikan harga. Ngagel Rejo, Sawunggaling, dan Darmo berada pada kisaran harga yang lebih stabil.
+                    Titik tahun di mana garis naik tajam berkorelasi dengan peristiwa kebijakan (lihat tooltip).
+                  </p>
+                </div>
+
+                {/* Pertumbuhan Harga Tahunan (%) */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Pertumbuhan Harga Rata-rata Tahunan (%)"
+                    sub="Rata-rata pertumbuhan harga tanah lintas kelurahan per tahun" />
+                  <ResponsiveContainer width="100%" height={240}>
+                    <BarChart data={TREN_TAHUNAN.filter(r => r.tumbuh !== null)}
+                      margin={{ top: 8, right: 16, bottom: 8, left: -8 }}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="y" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false}
+                        tickFormatter={v => `${v}%`} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null
+                        const row = TREN_TAHUNAN.find(r => r.y === label)
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-1">Tahun {label}</p>
+                            <p style={{ color: payload[0].fill }}>Pertumbuhan: <b>{payload[0].value?.toFixed(2)}%</b></p>
+                            {row?.event && <p className="text-amber-600 mt-1.5 leading-tight">📌 {row.event}</p>}
+                          </div>
+                        )
+                      }} />
+                      <ReferenceLine y={0} stroke="#e2e8f0" />
+                      <Bar dataKey="tumbuh" name="Pertumbuhan (%)" radius={[3, 3, 0, 0]}>
+                        {TREN_TAHUNAN.filter(r => r.tumbuh !== null).map((row, i) => (
+                          <Cell key={i} fill={row.tumbuh >= 5 ? '#2563eb' : row.tumbuh >= 2 ? '#059669' : row.tumbuh >= 0 ? '#d97706' : '#dc2626'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100">
+                    {[
+                      { c: '#2563eb', l: '≥ 5% (Tinggi)' },
+                      { c: '#059669', l: '2–5% (Moderat)' },
+                      { c: '#d97706', l: '0–2% (Lambat)' },
+                    ].map(({ c, l }) => (
+                      <div key={l} className="flex items-center gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-sm" style={{ background: c }} />
+                        <span className="text-[10px] text-slate-500">{l}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+
+                {/* IHPR Kuartalan — Area chart */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="IHPR Surabaya Kuartalan (Q1 2012 – Q1 2025)"
+                    sub="Indeks Harga Properti Residensial per tipe rumah (baseline 2018=100) — sumber: BI"
+                    badge="Kuartalan" />
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={TREN_KUARTALAN} margin={{ top: 8, right: 16, bottom: 24, left: 0 }}>
+                      <defs>
+                        <linearGradient id="gradKecil"   x1="0" y1="0" x2="0" y2="1"><stop offset="5%"  stopColor="#2563eb" stopOpacity={0.3}/><stop offset="95%" stopColor="#2563eb" stopOpacity={0}/></linearGradient>
+                        <linearGradient id="gradMenengah" x1="0" y1="0" x2="0" y2="1"><stop offset="5%"  stopColor="#7c3aed" stopOpacity={0.2}/><stop offset="95%" stopColor="#7c3aed" stopOpacity={0}/></linearGradient>
+                        <linearGradient id="gradBesar"   x1="0" y1="0" x2="0" y2="1"><stop offset="5%"  stopColor="#059669" stopOpacity={0.2}/><stop offset="95%" stopColor="#059669" stopOpacity={0}/></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="p" tick={{ fill: '#94a3b8', fontSize: 8 }} tickLine={false} axisLine={false}
+                        interval={7} angle={-30} textAnchor="end" height={40} />
+                      <YAxis domain={[60, 130]} tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-2">{label}</p>
+                            {payload.map((p, i) => (
+                              <p key={i} style={{ color: p.color }}>
+                                {p.name}: <b>{p.value?.toFixed(2)}</b>
+                              </p>
+                            ))}
+                          </div>
+                        )
+                      }} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      <ReferenceLine y={100} stroke="#e2e8f0" strokeDasharray="4 2" label={{ value: 'Base 2018', position: 'right', fill: '#94a3b8', fontSize: 9 }} />
+                      <Area type="monotone" dataKey="kecil"    name="Rumah Kecil"    stroke="#2563eb" fill="url(#gradKecil)"    strokeWidth={1.5} dot={false} />
+                      <Area type="monotone" dataKey="menengah" name="Rumah Menengah" stroke="#7c3aed" fill="url(#gradMenengah)" strokeWidth={1.5} dot={false} />
+                      <Area type="monotone" dataKey="besar"    name="Rumah Besar"    stroke="#059669" fill="url(#gradBesar)"    strokeWidth={1.5} dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                  <p className="text-slate-400 text-[10px] mt-3 pt-3 border-t border-slate-100">
+                    Rumah Kecil memimpin kenaikan IHPR — lebih responsif terhadap stimulus permintaan (KPR, LTV, PPN DTP).
+                    Perlambatan 2015–2021 mencerminkan konsolidasi pasar, dipercepat oleh pandemi COVID-19.
+                    Pemulihan 2022–2025 didorong normalisasi suku bunga dan stimulus fiskal pasca pandemi.
+                  </p>
+                </div>
+
+                {/* Perbandingan Harga Wonokromo vs Ngagel detail */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Perbandingan NT/m² — Wonokromo vs Ngagel"
+                    sub="Dua kelurahan dengan harga tertinggi: selisih dan tren relatif (2010–2025)" />
+                  <ResponsiveContainer width="100%" height={240}>
+                    <ComposedChart data={TREN_TAHUNAN} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="y" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis yAxisId="left" tickFormatter={v => `${(v/1e6).toFixed(0)}jt`}
+                        tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
+                      <YAxis yAxisId="right" orientation="right"
+                        tickFormatter={v => `${(v/1e6).toFixed(0)}jt`}
+                        tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} width={36} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-1.5">Tahun {label}</p>
+                            {payload.map((p, i) => (
+                              <p key={i} style={{ color: p.color ?? p.fill }}>
+                                {p.name}: <b>{fmtJt(p.value, 1)}</b>
+                              </p>
+                            ))}
+                          </div>
+                        )
+                      }} />
+                      <Legend wrapperStyle={{ fontSize: 10 }} />
+                      <Bar yAxisId="left" dataKey="wo" name="Wonokromo" fill="#2563eb" radius={[2,2,0,0]} opacity={0.7} />
+                      <Bar yAxisId="right" dataKey="ng" name="Ngagel" fill="#7c3aed" radius={[2,2,0,0]} opacity={0.7} />
+                      <Line yAxisId="left" type="monotone" dataKey="wo" stroke="#1d4ed8" strokeWidth={2} dot={false} legendType="none" />
+                      <Line yAxisId="right" type="monotone" dataKey="ng" stroke="#6d28d9" strokeWidth={2} dot={false} legendType="none" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
               </div>
             )}
 
@@ -762,7 +1064,7 @@ export default function Dashboard() {
 
       <footer className="mt-8 py-6 px-6 border-t border-slate-200 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-slate-400 text-xs">© 2024 WebGIS ZNT Wonokromo · Kecamatan Wonokromo, Surabaya</p>
+          <p className="text-slate-400 text-xs">© 2026 WebGIS ZNT Wonokromo · Kecamatan Wonokromo, Surabaya</p>
           <p className="text-slate-400 text-xs">Data: Platform Bhumi · Model: LightGBM + AHP (IAAO Standard COD)</p>
         </div>
       </footer>

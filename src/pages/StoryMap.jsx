@@ -8,6 +8,64 @@ import { getZntStyle } from '../utils'
 import { ZNT_STYLE, MAP_CENTER } from '../config'
 import NavBar from '../components/NavBar'
 
+/* ─── SVG icon strings for facility map markers ─────── */
+const FAC_SVG = {
+  faskes: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white"><rect x="4.5" y="0" width="3" height="12" rx="1"/><rect x="0" y="4.5" width="12" height="3" rx="1"/></svg>`,
+  cbd:    `<svg width="13" height="13" viewBox="0 0 12 12" fill="white"><rect x="2" y="3.5" width="8" height="8.5" rx="0.5"/><path d="M1.5 3.5L6 0.5l4.5 3" fill="white"/><rect x="3.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/><rect x="6.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/><rect x="5" y="9.5" width="2" height="2.5" fill="#7c3aed"/></svg>`,
+  pendidikan: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white"><path d="M6 1L0 4.5l6 3.5 6-3.5L6 1z"/><path d="M2 6v4l4 2 4-2V6" stroke="white" stroke-width="1.4" fill="none"/></svg>`,
+  pasar: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white"><path d="M1.5 4.5h9l-1 7h-7l-1-7z"/><path d="M4 4.5V3a2 2 0 014 0v1.5" fill="none" stroke="white" stroke-width="1.4"/></svg>`,
+  transportasi: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white"><rect x="1" y="1.5" width="10" height="7" rx="1.5"/><rect x="2.5" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/><rect x="7" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/><circle cx="3" cy="10.5" r="1.2"/><circle cx="9" cy="10.5" r="1.2"/><rect x="4" y="9.8" width="4" height="1.4" rx="0.5"/></svg>`,
+}
+
+function facilityMarker(layerId, color, size = 26) {
+  const svg = FAC_SVG[layerId] ?? ''
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border:2.5px solid white;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;">${svg}</div>`,
+    className: '', iconAnchor: [size / 2, size / 2]
+  })
+}
+
+/* ─── Facility icon React components (for legend) ─── */
+const FacIcons = {
+  faskes: ({ s = 10 }) => (
+    <svg width={s} height={s} viewBox="0 0 12 12" fill="white">
+      <rect x="4.5" y="0" width="3" height="12" rx="1"/>
+      <rect x="0" y="4.5" width="12" height="3" rx="1"/>
+    </svg>
+  ),
+  pendidikan: ({ s = 10 }) => (
+    <svg width={s} height={s} viewBox="0 0 12 12" fill="white">
+      <path d="M6 1L0 4.5l6 3.5 6-3.5L6 1z"/>
+      <path d="M2 6v4l4 2 4-2V6" stroke="white" strokeWidth="1.4" fill="none" strokeLinejoin="round"/>
+    </svg>
+  ),
+  cbd: ({ s = 10 }) => (
+    <svg width={s} height={s} viewBox="0 0 12 12" fill="white">
+      <rect x="2" y="3.5" width="8" height="8.5" rx="0.5"/>
+      <path d="M1.5 3.5L6 0.5l4.5 3" fill="white"/>
+      <rect x="3.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/>
+      <rect x="6.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/>
+      <rect x="5" y="9.5" width="2" height="2.5" fill="#7c3aed"/>
+    </svg>
+  ),
+  pasar: ({ s = 10 }) => (
+    <svg width={s} height={s} viewBox="0 0 12 12" fill="white">
+      <path d="M1.5 4.5h9l-1 7h-7l-1-7z"/>
+      <path d="M4 4.5V3a2 2 0 014 0v1.5" fill="none" stroke="white" strokeWidth="1.4"/>
+    </svg>
+  ),
+  transportasi: ({ s = 10 }) => (
+    <svg width={s} height={s} viewBox="0 0 12 12" fill="white">
+      <rect x="1" y="1.5" width="10" height="7" rx="1.5"/>
+      <rect x="2.5" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/>
+      <rect x="7" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/>
+      <circle cx="3" cy="10.5" r="1.2" fill="white"/>
+      <circle cx="9" cy="10.5" r="1.2" fill="white"/>
+      <rect x="4" y="9.8" width="4" height="1.4" rx="0.5"/>
+    </svg>
+  ),
+}
+
 delete L.Icon.Default.prototype._getIconUrl
 L.Icon.Default.mergeOptions({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
@@ -58,9 +116,9 @@ const CHAPTERS = [
       { label: 'Pasar', weight: 0.08, color: '#ea580c' },
     ],
     legend: [
-      { type: 'line', color: '#dc2626', label: 'Jalan Kolektor', weight: 2.5 },
-      { type: 'circle', color: '#7c3aed', label: 'CBD / Pusat Bisnis', r: 8 },
-      { type: 'circle', color: '#e11d48', label: 'Fasilitas Kesehatan', r: 6 },
+      { type: 'line',     color: '#dc2626', label: 'Jalan Kolektor' },
+      { type: 'facility', color: '#7c3aed', layerId: 'cbd',    label: 'CBD / Pusat Bisnis' },
+      { type: 'facility', color: '#e11d48', layerId: 'faskes', label: 'Fasilitas Kesehatan' },
     ],
   },
   {
@@ -69,12 +127,12 @@ const CHAPTERS = [
     subtitle: 'Choropleth Zona Nilai Tanah',
     center: [-7.300, 112.731], zoom: 14,
     stats: [
-      { label: 'ZNT I – Skor Sangat Rendah', value: 'Harga > 23 jt/m²' },
-      { label: 'ZNT III – Skor Sedang', value: 'Harga 3.25–6.34 jt/m²' },
-      { label: 'ZNT V – Skor Sangat Tinggi', value: 'Harga 16.6–22.9 jt/m²' },
-      { label: 'Akurasi Model', value: 'R² = 0.87' },
+      { label: 'ZNT I – Skor Sangat Rendah',  value: 'Harga 3.25–6.34 jt/m²' },
+      { label: 'ZNT III – Skor Sedang',        value: 'Harga 11.71–16.58 jt/m²' },
+      { label: 'ZNT V – Skor Sangat Tinggi',   value: 'Harga 23–40 jt/m²' },
+      { label: 'Akurasi Model',                value: 'R² = 0.87' },
     ],
-    body: 'Peta choropleth ZNT menunjukkan zona nilai berdasarkan skor model gabungan AHP+LGB. Menariknya, ZNT I (skor model terendah) memiliki harga pasar tertinggi (>23 jt/m²), mengindikasikan faktor nilai yang belum tertangkap oleh model aksesibilitas.',
+    body: 'Peta choropleth ZNT menunjukkan zona nilai berdasarkan skor model gabungan AHP+LGB. Model menunjukkan konsistensi yang baik — ZNT I (skor terendah 0.22) memiliki harga pasar terendah (3.25–6.34 jt/m²), sementara ZNT V (skor tertinggi 0.68) memiliki harga tertinggi (23–40 jt/m²), mengkonfirmasi daya prediksi R²=0.87.',
     showZNT: true, showDataset: true,
     legend: [
       { type: 'znt', id: 1, label: 'ZNT I – Skor Sangat Rendah' },
@@ -119,9 +177,9 @@ const CHAPTERS = [
     legend: [
       { type: 'znt-all', label: 'Zona Nilai Tanah (ZNT)' },
       { type: 'polygon', color: '#1e40af', label: 'Batas Kelurahan', opacity: 0.4 },
-      { type: 'circle', color: '#059669', label: 'Harga < 5 jt/m²', r: 5 },
-      { type: 'circle', color: '#2563eb', label: 'Harga 5–20 jt/m²', r: 5 },
-      { type: 'circle', color: '#dc2626', label: 'Harga > 20 jt/m²', r: 5 },
+      { type: 'circle',  color: '#059669', label: 'Harga < 5 jt/m²',   r: 5 },
+      { type: 'circle',  color: '#2563eb', label: 'Harga 5–20 jt/m²',  r: 5 },
+      { type: 'circle',  color: '#dc2626', label: 'Harga > 20 jt/m²',  r: 5 },
     ],
   },
 ]
@@ -139,11 +197,24 @@ function LegendItem({ item }) {
   if (item.type === 'circle') return (
     <div className="flex items-center gap-2.5">
       <div className="flex-shrink-0 flex items-center justify-center w-5">
-        <div className="rounded-full border-2 border-white shadow-sm" style={{ width: (item.r || 6) * 2, height: (item.r || 6) * 2, background: item.color }} />
+        <div className="rounded-full border-2 border-white shadow-sm"
+          style={{ width: (item.r || 6) * 2, height: (item.r || 6) * 2, background: item.color }} />
       </div>
       <span className="text-[11px] text-slate-600">{item.label}</span>
     </div>
   )
+  if (item.type === 'facility') {
+    const Icon = FacIcons[item.layerId]
+    return (
+      <div className="flex items-center gap-2.5">
+        <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-white shadow-sm"
+          style={{ background: item.color }}>
+          {Icon && <Icon s={11} />}
+        </div>
+        <span className="text-[11px] text-slate-600">{item.label}</span>
+      </div>
+    )
+  }
   if (item.type === 'znt') return (
     <div className="flex items-center gap-2.5">
       <div className="w-5 h-3.5 rounded flex-shrink-0 border border-black/10" style={{ background: ZNT_STYLE[item.id].fill }} />
@@ -217,12 +288,12 @@ function StoryMap_Map({ chapter, geoData }) {
         {/* Faskes */}
         {chapter.showFaskes && geoData.faskes && (
           <GeoJSON key={`faskes-${chapter.id}`} data={geoData.faskes}
-            pointToLayer={(_, ll) => L.marker(ll, { icon: dotIcon('#e11d48', 6) })} />
+            pointToLayer={(_, ll) => L.marker(ll, { icon: facilityMarker('faskes', '#e11d48', 22) })} />
         )}
         {/* CBD */}
         {chapter.showCBD && geoData.cbd && (
           <GeoJSON key={`cbd-${chapter.id}`} data={geoData.cbd}
-            pointToLayer={(_, ll) => L.marker(ll, { icon: dotIcon('#7c3aed', 8) })} />
+            pointToLayer={(_, ll) => L.marker(ll, { icon: facilityMarker('cbd', '#7c3aed', 24) })} />
         )}
         <MapFlyer center={chapter.center} zoom={chapter.zoom} />
       </MapContainer>
@@ -411,7 +482,7 @@ export default function StoryMap() {
             </div>
           </div>
           <div className="px-8 py-6">
-            <p className="text-slate-400 text-xs text-center">© 2024 WebGIS ZNT Wonokromo · Kecamatan Wonokromo, Surabaya</p>
+            <p className="text-slate-400 text-xs text-center">© 2026 WebGIS ZNT Wonokromo · Kecamatan Wonokromo, Surabaya</p>
           </div>
         </div>
       </div>

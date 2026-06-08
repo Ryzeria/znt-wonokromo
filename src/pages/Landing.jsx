@@ -91,7 +91,7 @@ export default function Landing() {
         <div className="relative z-10 max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-blue-200 bg-blue-50 text-blue-700 text-xs font-semibold mb-8 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            Kecamatan Wonokromo · Kota Surabaya · 2024
+            Kecamatan Wonokromo · Kota Surabaya · 2026
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold text-slate-900 leading-[1.05] tracking-tight mb-6">
@@ -282,7 +282,7 @@ export default function Landing() {
               <p className="text-slate-600 text-sm mb-1">
                 <strong>Departemen Teknik Geomatika</strong> · Institut Teknologi Sepuluh Nopember (ITS)
               </p>
-              <p className="text-slate-400 text-xs">Tugas Akhir / Penelitian · Semester Genap 2024</p>
+              <p className="text-slate-400 text-xs">Tugas Akhir / Penelitian · Semester Genap 2026</p>
             </div>
           </div>
         </div>
@@ -313,7 +313,7 @@ export default function Landing() {
               <img src={`${BASE}assets/logo.svg`} alt="ZNT" className="w-full h-full object-contain"
                 onError={e => { e.target.src = `${BASE}assets/logo.png` }} />
             </div>
-            <p className="text-slate-400 text-xs">© 2024 WebGIS ZNT Wonokromo</p>
+            <p className="text-slate-400 text-xs">© 2026 WebGIS ZNT Wonokromo</p>
           </div>
           <p className="text-slate-400 text-xs">WGS 84 / EPSG:4326 · LightGBM + AHP + GIS</p>
         </div>

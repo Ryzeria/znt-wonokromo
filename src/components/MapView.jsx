@@ -34,6 +34,51 @@ function dotIcon(color, size = 12) {
   })
 }
 
+/* ─── SVG symbol map for facility layers ─────────────── */
+const FACILITY_SVG = {
+  faskes: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4.5" y="0" width="3" height="12" rx="1"/>
+    <rect x="0" y="4.5" width="12" height="3" rx="1"/>
+  </svg>`,
+  pendidikan: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <path d="M6 1L0 4.5l6 3.5 6-3.5L6 1z"/>
+    <path d="M2 6v4l4 2 4-2V6" stroke="white" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+  </svg>`,
+  cbd: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="3.5" width="8" height="8.5" rx="0.5"/>
+    <path d="M1.5 3.5L6 0.5l4.5 3" stroke="white" stroke-width="1.2" fill="white"/>
+    <rect x="3.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/>
+    <rect x="6.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/>
+    <rect x="5" y="9.5" width="2" height="2.5" fill="#7c3aed"/>
+  </svg>`,
+  pasar: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <path d="M1.5 4.5h9l-1 7h-7l-1-7z"/>
+    <path d="M4 4.5V3a2 2 0 014 0v1.5" fill="none" stroke="white" stroke-width="1.4"/>
+    <circle cx="4.5" cy="7" r="0.8" fill="#ea580c"/>
+    <circle cx="7.5" cy="7" r="0.8" fill="#ea580c"/>
+  </svg>`,
+  transportasi: `<svg width="13" height="13" viewBox="0 0 12 12" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <rect x="1" y="1.5" width="10" height="7" rx="1.5"/>
+    <rect x="2.5" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/>
+    <rect x="7" y="3" width="2.5" height="2" rx="0.4" fill="#0891b2"/>
+    <rect x="5.5" y="8.5" width="1" height="1.5" fill="white"/>
+    <circle cx="3" cy="10.5" r="1.2"/>
+    <circle cx="9" cy="10.5" r="1.2"/>
+    <rect x="4" y="9.8" width="4" height="1.4" rx="0.5"/>
+  </svg>`,
+}
+
+/* ─── Facility icon factory (with SVG symbol) ─────────── */
+function facilityIcon(layerId, color, size = 26) {
+  const svg = FACILITY_SVG[layerId]
+  if (!svg) return dotIcon(color, size)
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border:2.5px solid white;border-radius:50%;
+      box-shadow:0 1px 6px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;">${svg}</div>`,
+    className: '', iconAnchor: [size / 2, size / 2]
+  })
+}
+
 /* ─── Bubble icon factory ────────────────────────────── */
 function bubbleIcon(color, size) {
   const s = Math.max(8, Math.min(40, size))
@@ -346,7 +391,7 @@ export default function MapView({
         { id: 'transportasi', label: 'Transportasi',  color: '#0891b2' }
       ].map(({ id, label, color }) => visibleLayers[id] && geoData[id] && (
         <GeoJSON key={`${id}-${op(id)}`} data={geoData[id]}
-          pointToLayer={(_, ll) => L.marker(ll, { icon: dotIcon(color, 12) })}
+          pointToLayer={(_, ll) => L.marker(ll, { icon: facilityIcon(id, color, 26) })}
           onEachFeature={mkEach(label, color)} />
       ))}
 
