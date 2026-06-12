@@ -103,17 +103,21 @@ const DESA_INFO = {
   WONOKROMO:    { dens: 34149, luas: 2.04, note: 'Pusat kecamatan, kepadatan tertinggi' },
 }
 
-/* ─── Simulation point features ─────────────────────── */
-// Skenario: penambahan CBD baru (pusat perbelanjaan/komersial) + faskes baru
-// di wilayah yang saat ini kekurangan fasilitas (barat-tengah Wonokromo)
-const SIM_CBD_LNG  = 112.7245   // CBD baru — barat tengah, area ZNT I/II saat ini
-const SIM_CBD_LAT  = -7.3068
-const SIM_FASKES_LNG = 112.7198
-const SIM_FASKES_LAT = -7.3090
+/* ─── Simulation point features — Gap Analysis Based ────────────────────
+ * Gap teridentifikasi dari data eksisting:
+ *  - CBD terdekat (Royal Plaza): ±1,65 km ke timur → barat-selatan tidak terlayani
+ *  - Pasar terdekat (DTC Wonokromo): ±1,4 km ke timur → gap nyata di barat
+ *  - ZNT I/II: 21 sub-polygon di area gap lng 112.720–112.728
+ * Skenario: CBD + Pasar baru di barat-selatan Sawunggaling (wilayah kosong faktual)
+ * ────────────────────────────────────────────────────────────────────── */
+const SIM_CBD_LNG   = 112.7215   // CBD baru — barat Sawunggaling, gap ±1,65 km
+const SIM_CBD_LAT   = -7.3018
+const SIM_PASAR_LNG = 112.7228   // Pasar baru — barat-selatan, gap ±1,4 km
+const SIM_PASAR_LAT = -7.3065
 
-const CBD_NEAR_THRESH  = 0.0015  // ~165m — dampak CBD kuat (bobot 35%): naik 2 zona
-const CBD_FAR_THRESH   = 0.0035  // ~390m — dampak CBD moderat: naik 1 zona
-const FASKES_THRESH    = 0.0028  // ~310m — dampak faskes (bobot 20%): naik 1 zona
+const CBD_NEAR_THRESH  = 0.0018  // ~200m  — CBD langsung (bobot 35%): naik 2 zona
+const CBD_FAR_THRESH   = 0.0045  // ~500m  — CBD sekunder (bobot 35%): naik 1 zona
+const PASAR_THRESH     = 0.0032  // ~355m  — pasar (bobot 8%): naik 1 zona
 
 function simDist(lng, lat, refLng, refLat) {
   const dx = (lng - refLng) * 0.992  // koreksi cos(lat ≈ -7°)
@@ -194,20 +198,20 @@ const CHAPTERS = [
   {
     id: 'simulation', badge: '04', color: '#7c3aed',
     title: 'Simulasi Skenario',
-    subtitle: 'Dampak Pengembangan Infrastruktur',
-    center: [-7.307, 112.726], zoom: 14,
+    subtitle: 'Gap Fasilitas — Barat-Selatan Wonokromo',
+    center: [-7.304, 112.723], zoom: 15,
     stats: [
-      { label: 'Kenaikan Skor ZNT (CBD Baru)', value: '+15–25%' },
-      { label: 'Kenaikan ZNT (Faskes Baru)',   value: '+5–8%' },
-      { label: 'Zona Terdampak Positif',        value: '±240 ha' },
-      { label: 'Radius Analisis (CBD)', value: '165–390 m' },
+      { label: 'Gap CBD ke Barat-Selatan', value: '±1,65 km' },
+      { label: 'Gap Pasar ke Barat-Selatan', value: '±1,4 km' },
+      { label: 'Proyeksi Kenaikan ZNT', value: '+25–43%' },
+      { label: 'Perubahan Zona', value: 'ZNT I/II → III/IV' },
     ],
-    body: 'Simulasi menunjukkan penambahan titik CBD baru (pusat perbelanjaan/komersial) di wilayah yang belum terlayani berpotensi meningkatkan skor ZNT 15–25% pada radius 165m dan 8–12% pada radius 390m, mengikuti bobot AHP CBD tertinggi (35%). Penambahan faskes baru memberikan dampak tambahan 5–8%. Aktifkan skenario untuk melihat perubahan zona secara spasial.',
+    body: 'Analisis gap fasilitas mengidentifikasi wilayah barat-selatan Sawunggaling (lng 112.720–112.728) sebagai area paling minim layanan: tidak ada CBD dalam radius 1,65 km dan tidak ada pasar dalam radius 1,4 km — dua faktor dengan bobot AHP tertinggi (35%+8%=43%). ZNT I–II di area ini berpotensi naik 1–2 zona jika kedua fasilitas direalisasikan.',
     showZNT: true, showJalan: true, showSungai: true,
     legend: [
       { type: 'znt-all', label: 'Zona Nilai Tanah (ZNT)' },
-      { type: 'facility', color: '#7c3aed', layerId: 'cbd',    label: 'CBD Rencana (Baru)' },
-      { type: 'facility', color: '#16a34a', layerId: 'faskes', label: 'Faskes Rencana (Baru)' },
+      { type: 'facility', color: '#7c3aed', layerId: 'cbd',   label: 'CBD Rencana (Baru)' },
+      { type: 'facility', color: '#ea580c', layerId: 'pasar', label: 'Pasar Rencana (Baru)' },
     ],
   },
   {
@@ -303,9 +307,9 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
     className: '', iconAnchor: [size, size]
   })
 
-  const newFaskesIcon = L.divIcon({
-    html: `<div style="width:28px;height:28px;background:#16a34a;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;">
-      <svg width="14" height="14" viewBox="0 0 12 12" fill="white"><rect x="4.5" y="0" width="3" height="12" rx="1"/><rect x="0" y="4.5" width="12" height="3" rx="1"/></svg>
+  const newPasarIcon = L.divIcon({
+    html: `<div style="width:28px;height:28px;background:#ea580c;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;">
+      <svg width="14" height="14" viewBox="0 0 12 12" fill="white"><path d="M1.5 4.5h9l-1 7h-7l-1-7z"/><path d="M4 4.5V3a2 2 0 014 0v1.5" fill="none" stroke="white" stroke-width="1.4"/></svg>
     </div>`,
     className: '', iconAnchor: [14, 14]
   })
@@ -313,7 +317,7 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
   /* ── Inject WebGIS popup CSS ── */
   useEffect(() => { injectPopupStyles() }, [])
 
-  /* ── Simulated ZNT: upgrade sub-polygons near new CBD + faskes ── */
+  /* ── Simulated ZNT: upgrade sub-polygons near new CBD + Pasar (gap-based) ── */
   const simZNT = useMemo(() => {
     if (!geoData.znt || !simulationOn) return null
     const upgraded = []
@@ -325,12 +329,12 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
         const lats = ring.map(c => c[1]); const lngs = ring.map(c => c[0])
         const clat = (Math.min(...lats) + Math.max(...lats)) / 2
         const clng = (Math.min(...lngs) + Math.max(...lngs)) / 2
-        const dCBD    = simDist(clng, clat, SIM_CBD_LNG, SIM_CBD_LAT)
-        const dFaskes = simDist(clng, clat, SIM_FASKES_LNG, SIM_FASKES_LAT)
+        const dCBD   = simDist(clng, clat, SIM_CBD_LNG, SIM_CBD_LAT)
+        const dPasar = simDist(clng, clat, SIM_PASAR_LNG, SIM_PASAR_LAT)
         let boost = 0
         if (dCBD < CBD_NEAR_THRESH) boost = Math.max(boost, 2)
         else if (dCBD < CBD_FAR_THRESH) boost = Math.max(boost, 1)
-        if (dFaskes < FASKES_THRESH) boost = Math.max(boost, 1)
+        if (dPasar < PASAR_THRESH) boost = Math.max(boost, 1)
         if (boost === 0) return
         upgraded.push({
           type: 'Feature',
@@ -425,20 +429,18 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
           <GeoJSON key={`cbd-${chapter.id}`} data={geoData.cbd}
             pointToLayer={(_, ll) => L.marker(ll, { icon: facilityMarker('cbd', '#7c3aed', 24) })} />
         )}
-        {/* ── Simulation overlay: upgraded ZNT parcels + new CBD + faskes point ── */}
+        {/* ── Simulation overlay: upgraded ZNT parcels + new CBD + Pasar ── */}
         {chapter.id === 'simulation' && simulationOn && simZNT && (
           <>
-            {/* Real ZNT parcels re-colored to upgraded zone */}
             <GeoJSON key="sim-znt-upgrade" data={simZNT}
               style={(f) => {
                 const s = getZntStyle(f)
                 return { ...s, fillOpacity: 0.9, weight: 1, color: 'rgba(255,255,255,0.6)', opacity: 0.8 }
               }} />
-            {/* New CBD marker (purple — same style as existing CBD layer) */}
             <Marker key="sim-cbd" position={[SIM_CBD_LAT, SIM_CBD_LNG]}
               icon={facilityMarker('cbd', '#7c3aed', 28)} />
-            {/* New faskes marker (green) */}
-            <Marker key="sim-faskes" position={[SIM_FASKES_LAT, SIM_FASKES_LNG]} icon={newFaskesIcon} />
+            <Marker key="sim-pasar" position={[SIM_PASAR_LAT, SIM_PASAR_LNG]}
+              icon={newPasarIcon} />
           </>
         )}
 
@@ -598,10 +600,10 @@ export default function StoryMap() {
                       <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Kondisi Saat Ini</p>
                       <div className="space-y-1.5">
                         {[
-                          { l: 'Dominan Zona', v: 'ZNT I–II' },
-                          { l: 'Skor Komposit', v: '0.225–0.265' },
-                          { l: 'NT Area Barat', v: '~Rp 5.5 jt/m²' },
-                          { l: 'Fasilitas CBD', v: 'Tidak ada' },
+                          { l: 'Dominan Zona',    v: 'ZNT I–II' },
+                          { l: 'Gap CBD',         v: '±1,65 km' },
+                          { l: 'Gap Pasar',       v: '±1,4 km' },
+                          { l: 'NT Barat-Selatan', v: '~Rp 5–6 jt/m²' },
                         ].map(({ l, v }) => (
                           <div key={l} className="flex justify-between text-[10px]">
                             <span className="text-slate-500">{l}</span>
@@ -614,10 +616,10 @@ export default function StoryMap() {
                       <p className="text-[9px] font-bold uppercase tracking-widest text-violet-500 mb-2">Setelah Pengembangan</p>
                       <div className="space-y-1.5">
                         {[
-                          { l: 'Proyeksi Zona', v: 'ZNT II–III' },
-                          { l: 'Skor Komposit', v: '0.287 (+20%)' },
-                          { l: 'NT Proyeksi', v: '~Rp 7.5 jt/m²' },
-                          { l: 'Fasilitas CBD', v: '+1 titik baru' },
+                          { l: 'Proyeksi Zona',   v: 'ZNT III–IV' },
+                          { l: 'CBD + Pasar',     v: 'Terlayani (<500m)' },
+                          { l: 'Kenaikan Skor',   v: '+25–43%' },
+                          { l: 'NT Proyeksi',     v: '~Rp 9–12 jt/m²' },
                         ].map(({ l, v }) => (
                           <div key={l} className="flex justify-between text-[10px]">
                             <span className="text-slate-500">{l}</span>
@@ -631,31 +633,31 @@ export default function StoryMap() {
                   {/* Fasilitas baru legend */}
                   {simulationOn && (
                     <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3 space-y-2">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-violet-600 mb-2">Fasilitas Baru (Peta)</p>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-violet-600 mb-2">Fasilitas Baru di Peta</p>
                       <div className="flex items-center gap-2.5">
                         <div className="w-5 h-5 rounded-full flex-shrink-0 bg-violet-700 border-2 border-white flex items-center justify-center shadow-sm">
                           <svg width="10" height="10" viewBox="0 0 12 12" fill="white"><rect x="2" y="3.5" width="8" height="8.5" rx="0.5"/><path d="M1.5 3.5L6 0.5l4.5 3" fill="white"/><rect x="3.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/><rect x="6.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/></svg>
                         </div>
-                        <span className="text-[10px] text-slate-700">CBD Baru — Pusat Perbelanjaan (bobot 35%)</span>
+                        <span className="text-[10px] text-slate-700">CBD Baru — Pusat Perbelanjaan (bobot AHP 35%)</span>
                       </div>
                       <div className="flex items-center gap-2.5">
-                        <div className="w-5 h-5 rounded-full flex-shrink-0 bg-emerald-600 border-2 border-white flex items-center justify-center shadow-sm">
-                          <svg width="10" height="10" viewBox="0 0 12 12" fill="white"><rect x="4.5" y="0" width="3" height="12" rx="1"/><rect x="0" y="4.5" width="12" height="3" rx="1"/></svg>
+                        <div className="w-5 h-5 rounded-full flex-shrink-0 bg-orange-600 border-2 border-white flex items-center justify-center shadow-sm">
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="white"><path d="M1.5 4.5h9l-1 7h-7l-1-7z"/><path d="M4 4.5V3a2 2 0 014 0v1.5" fill="none" stroke="white" strokeWidth="1.4"/></svg>
                         </div>
-                        <span className="text-[10px] text-slate-700">Faskes Baru — Klinik Pratama (bobot 20%)</span>
+                        <span className="text-[10px] text-slate-700">Pasar Tradisional Baru (bobot AHP 8%)</span>
                       </div>
                     </div>
                   )}
 
                   {/* Key insights */}
                   <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
-                    <p className="text-[10px] font-bold text-slate-700 mb-1.5">Temuan Simulasi (Model AHP)</p>
+                    <p className="text-[10px] font-bold text-slate-700 mb-1.5">Temuan Simulasi (Model AHP + Gap Analysis)</p>
                     <ul className="space-y-0.5">
                       {[
-                        'CBD baru: +15–25% skor ZNT radius 165m, +8–12% radius 390m',
-                        'Faskes baru: +5–8% skor ZNT pada radius 310m',
-                        '±240 ha wilayah terdampak positif (ZNT I→II, II→III)',
-                        'Estimasi kenaikan NT: Rp 2–4 jt/m² dalam 3–5 tahun',
+                        'CBD baru menutup gap 1,65 km — ZNT I/II terdekat naik 2 zona (radius 200m)',
+                        'Pasar baru menutup gap 1,4 km — tambah +8% skor komposit (radius 355m)',
+                        'Kombinasi CBD+Pasar: ZNT I → III, ZNT II → III–IV di 21 sub-polygon',
+                        'Estimasi kenaikan NT: Rp 3–6 jt/m² dalam 3–5 tahun pengembangan',
                       ].map((item, idx) => (
                         <li key={idx} className="text-[10px] text-slate-600 flex items-start gap-1.5">
                           <span className="text-slate-400 flex-shrink-0 mt-0.5">▸</span>{item}
