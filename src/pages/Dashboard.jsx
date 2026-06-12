@@ -182,14 +182,18 @@ const TABS = [
   { id: 'tabel',      label: 'Tabel' },
 ]
 
-/* ─── Kelurahan colors ──────────────────────────────── */
+/* ─── Kelurahan colors (keys match dataset UPPERCASE values) ── */
 const KEL_COLORS = {
-  'Wonokromo':   '#2563eb',
-  'Ngagel':      '#7c3aed',
-  'Jagir':       '#059669',
-  'Ngagel Rejo': '#d97706',
-  'Sawunggaling':'#dc2626',
-  'Darmo':       '#0891b2',
+  'WONOKROMO':    '#1d4ed8',  // blue
+  'NGAGEL':       '#7c3aed',  // violet
+  'JAGIR':        '#059669',  // emerald
+  'NGAGELREJO':   '#ea580c',  // orange
+  'SAWUNGGALING': '#ca8a04',  // gold/yellow
+  'DARMO':        '#0891b2',  // cyan
+}
+const KEL_DISPLAY = {
+  'WONOKROMO': 'Wonokromo', 'NGAGEL': 'Ngagel', 'JAGIR': 'Jagir',
+  'NGAGELREJO': 'Ngagel Rejo', 'SAWUNGGALING': 'Sawunggaling', 'DARMO': 'Darmo',
 }
 
 export default function Dashboard() {
@@ -313,7 +317,8 @@ export default function Dashboard() {
       if (h > 0) groups[kel].push(h)
     })
     return Object.entries(groups).map(([kel, px]) => ({
-      name: kel,
+      name: KEL_DISPLAY[kel] || kel,
+      raw: kel,
       n: px.length,
       min: Math.min(...px),
       max: Math.max(...px),
@@ -840,14 +845,20 @@ export default function Dashboard() {
                 {/* KPI kelurahan */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                   {kelurahanData.map(k => (
-                    <div key={k.name} className="bg-white border-2 rounded-xl p-4 hover:shadow-md transition-all"
-                      style={{ borderColor: k.fill + '50' }}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: k.fill }} />
-                        <p className="text-slate-700 text-xs font-bold truncate">{k.name}</p>
+                    <div key={k.name} className="rounded-xl p-4 hover:shadow-lg transition-all border-2 relative overflow-hidden"
+                      style={{ borderColor: k.fill, background: `${k.fill}12` }}>
+                      <div className="absolute top-0 right-0 w-16 h-16 rounded-full opacity-10 -translate-y-4 translate-x-4"
+                        style={{ background: k.fill }} />
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5"
+                        style={{ background: k.fill }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="white"/>
+                          <circle cx="12" cy="9" r="2.5" fill={k.fill}/>
+                        </svg>
                       </div>
-                      <p className="text-lg font-extrabold tabular-nums" style={{ color: k.fill }}>{fmtJt(k.avg, 1)}</p>
-                      <p className="text-slate-400 text-[10px] mt-0.5">rata-rata · {k.n} sampel</p>
+                      <p className="text-xs font-bold truncate mb-0.5" style={{ color: k.fill }}>{k.name}</p>
+                      <p className="text-lg font-extrabold tabular-nums text-slate-900">{fmtJt(k.avg, 1)}</p>
+                      <p className="text-slate-500 text-[10px] mt-0.5">{k.n} sampel · rata-rata</p>
                     </div>
                   ))}
                 </div>

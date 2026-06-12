@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { MapContainer, TileLayer, GeoJSON, Marker, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Map, BarChart2, ChevronDown } from 'lucide-react'
@@ -77,6 +77,60 @@ L.Icon.Default.mergeOptions({
 const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const SAT_ATTR = '© Esri, DigitalGlobe, GeoEye'
 
+/* ─── Kelurahan visual data ─────────────────────────── */
+const DESA_COLORS = {
+  DARMO:        '#fbbf24',  // amber
+  NGAGEL:       '#34d399',  // emerald
+  JAGIR:        '#60a5fa',  // blue
+  NGAGELREJO:   '#f87171',  // red-pink
+  SAWUNGGALING: '#c084fc',  // purple
+  WONOKROMO:    '#fb923c',  // orange
+}
+const DESA_CENTROIDS = {
+  DARMO:        [-7.2873, 112.7345],
+  NGAGEL:       [-7.2884, 112.7447],
+  JAGIR:        [-7.3060, 112.7460],
+  NGAGELREJO:   [-7.2976, 112.7488],
+  SAWUNGGALING: [-7.2997, 112.7287],
+  WONOKROMO:    [-7.3051, 112.7302],
+}
+const DESA_INFO = {
+  DARMO:        { dens: 8531,  luas: 0.86, note: 'Kawasan elite, harga tanah tertinggi' },
+  NGAGEL:       { dens: 12994, luas: 0.94, note: 'Residential-komersial campuran' },
+  JAGIR:        { dens: 15358, luas: 1.13, note: 'Perumahan selatan, aksesibilitas sedang' },
+  NGAGELREJO:   { dens: 27498, luas: 0.79, note: 'Padat penduduk, aksesibilitas tinggi' },
+  SAWUNGGALING: { dens: 15056, luas: 0.92, note: 'Perumahan campuran, barat Wonokromo' },
+  WONOKROMO:    { dens: 34149, luas: 2.04, note: 'Pusat kecamatan, kepadatan tertinggi' },
+}
+
+/* ─── Simulation helpers ────────────────────────────── */
+const SIM_ROAD_COORDS = [
+  [112.716, -7.293], [112.721, -7.290], [112.728, -7.289],
+  [112.736, -7.290], [112.744, -7.292], [112.749, -7.295],
+]
+const SIM_FASKES_LNG = 112.733
+const SIM_FASKES_LAT = -7.292
+const ROAD_THRESH  = 0.004  // ≈ 440m in degrees
+const FASKES_THRESH = 0.003  // ≈ 330m
+
+function ptSeg2(px, py, ax, ay, bx, by) {
+  const dx = bx-ax, dy = by-ay
+  if (!dx && !dy) return (px-ax)**2 + (py-ay)**2
+  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy)/(dx*dx+dy*dy)))
+  return (px-ax-t*dx)**2 + (py-ay-t*dy)**2
+}
+function distToSimRoad(lng, lat) {
+  let d2 = Infinity
+  for (let i = 0; i < SIM_ROAD_COORDS.length-1; i++)
+    d2 = Math.min(d2, ptSeg2(lng, lat, SIM_ROAD_COORDS[i][0], SIM_ROAD_COORDS[i][1], SIM_ROAD_COORDS[i+1][0], SIM_ROAD_COORDS[i+1][1]))
+  return Math.sqrt(d2)
+}
+function distToSimFaskes(lng, lat) {
+  const dx = (lng - SIM_FASKES_LNG) * 0.99
+  const dy = lat - SIM_FASKES_LAT
+  return Math.sqrt(dx*dx + dy*dy)
+}
+
 const CHAPTERS = [
   {
     id: 'overview', badge: '01', color: '#2563eb',
@@ -89,10 +143,15 @@ const CHAPTERS = [
       { label: 'Penduduk',        value: '~248.000' },
       { label: 'Kepadatan',       value: '36.500/km²' },
     ],
-    body: 'Kecamatan Wonokromo terletak di bagian selatan pusat Kota Surabaya, mencakup 6 kelurahan dengan karakteristik spasial yang beragam. Dilintasi koridor Jalan Wonokromo sebagai arteri utama dan Kali Mas di sisi barat, kawasan ini memiliki dinamika nilai tanah yang sangat bervariasi.',
+    body: 'Kecamatan Wonokromo terletak di bagian selatan pusat Kota Surabaya, mencakup 6 kelurahan dengan karakteristik spasial yang beragam. Dilintasi koridor Jalan Wonokromo sebagai arteri utama dan Kali Mas di sisi barat, kawasan ini memiliki dinamika nilai tanah yang sangat bervariasi. Klik kelurahan untuk melihat data detail.',
     showDesa: true, showZNT: false,
     legend: [
-      { type: 'polygon', color: '#1e40af', label: 'Batas Kelurahan', opacity: 0.6 },
+      { type: 'desa-label', color: DESA_COLORS.DARMO,        label: 'Darmo' },
+      { type: 'desa-label', color: DESA_COLORS.NGAGEL,       label: 'Ngagel' },
+      { type: 'desa-label', color: DESA_COLORS.JAGIR,        label: 'Jagir' },
+      { type: 'desa-label', color: DESA_COLORS.NGAGELREJO,   label: 'Ngagel Rejo' },
+      { type: 'desa-label', color: DESA_COLORS.SAWUNGGALING, label: 'Sawunggaling' },
+      { type: 'desa-label', color: DESA_COLORS.WONOKROMO,    label: 'Wonokromo' },
     ],
   },
   {
@@ -186,6 +245,13 @@ const CHAPTERS = [
 
 /* Legend item renderer */
 function LegendItem({ item }) {
+  if (item.type === 'desa-label') return (
+    <div className="flex items-center gap-2.5">
+      <div className="w-5 h-3.5 rounded flex-shrink-0 border border-white/30 shadow-sm"
+        style={{ background: item.color, opacity: 0.85 }} />
+      <span className="text-[11px] text-slate-600">{item.label}</span>
+    </div>
+  )
   if (item.type === 'line') return (
     <div className="flex items-center gap-2.5">
       <div className="w-6 flex-shrink-0 flex items-center">
@@ -254,6 +320,36 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
     className: '', iconAnchor: [14, 14]
   })
 
+  /* ── Simulated ZNT upgrade: filter actual ZNT sub-polygons near proposed infra ── */
+  const simZNT = useMemo(() => {
+    if (!geoData.znt || !simulationOn) return null
+    const upgraded = []
+    geoData.znt.features.forEach(f => {
+      const zona = f.properties?.zona_id
+      if (zona > 2 || f.geometry.type !== 'MultiPolygon') return
+      f.geometry.coordinates.forEach(polyCoords => {
+        const ring = polyCoords[0]
+        const lats = ring.map(c => c[1]); const lngs = ring.map(c => c[0])
+        const clat = (Math.min(...lats) + Math.max(...lats)) / 2
+        const clng = (Math.min(...lngs) + Math.max(...lngs)) / 2
+        const dRoad = distToSimRoad(clng, clat)
+        const dFaskes = distToSimFaskes(clng, clat)
+        const inRoad = dRoad < ROAD_THRESH
+        const inFaskes = dFaskes < FASKES_THRESH
+        if (!inRoad && !inFaskes) return
+        let newZona = zona
+        if (zona === 1) newZona = (inFaskes && dFaskes < FASKES_THRESH * 0.6) ? 3 : 2
+        if (zona === 2) newZona = (inFaskes && dFaskes < FASKES_THRESH * 0.8) ? 3 : 3
+        upgraded.push({
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: polyCoords },
+          properties: { ...f.properties, zona_id: newZona, _sim: true },
+        })
+      })
+    })
+    return { type: 'FeatureCollection', features: upgraded }
+  }, [geoData.znt, simulationOn])
+
   return (
     <div className="relative w-full h-full">
       <MapContainer center={MAP_CENTER} zoom={13} className="w-full h-full z-0"
@@ -263,15 +359,44 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
         {/* Satellite basemap */}
         <TileLayer url={SAT_URL} attribution={SAT_ATTR} maxZoom={19} />
 
-        {/* Desa layer (chapter 1 & 5) */}
+        {/* Desa layer — chapter 1: colored fill + labels; others: outline only */}
         {chapter.showDesa && geoData.desa && (
           <GeoJSON key={`desa-${chapter.id}`} data={geoData.desa}
-            style={{ fillColor: 'transparent', color: '#2563eb', weight: 2, opacity: 0.85, dashArray: '4 2' }} />
+            style={(f) => {
+              const n = f.properties?.NAMOBJ || ''
+              const fill = DESA_COLORS[n] || '#94a3b8'
+              if (chapter.id === 'overview') return { fillColor: fill, fillOpacity: 0.28, color: '#fff', weight: 2.5, opacity: 0.9 }
+              return { fillColor: 'transparent', color: '#3b82f6', weight: 2, opacity: 0.75, dashArray: '4 2' }
+            }}
+            onEachFeature={(f, layer) => {
+              if (chapter.id !== 'overview') return
+              const n = f.properties?.NAMOBJ || ''
+              const info = DESA_INFO[n] || {}
+              const display = n === 'NGAGELREJO' ? 'Ngagel Rejo' : n.charAt(0) + n.slice(1).toLowerCase()
+              const pop = Math.round((info.dens || 0) * (info.luas || 0))
+              layer.bindPopup(`<div style="font-family:sans-serif;min-width:155px;padding:4px 0">
+                <div style="font-weight:800;font-size:13px;color:#1e293b;margin-bottom:6px;border-bottom:2px solid ${DESA_COLORS[n] || '#94a3b8'};padding-bottom:4px">${display}</div>
+                <div style="font-size:11px;color:#475569;line-height:2">
+                  <div>Kepadatan: <b style="color:#1e293b">${(info.dens||0).toLocaleString('id-ID')}/km²</b></div>
+                  <div>Luas est.: <b style="color:#1e293b">${info.luas||'–'} km²</b></div>
+                  <div>Penduduk est.: <b style="color:#1e293b">~${(pop/1000).toFixed(1)}k jiwa</b></div>
+                  <div style="color:#94a3b8;font-size:10px;margin-top:3px">${info.note||''}</div>
+                </div>
+              </div>`, { maxWidth: 210 })
+            }}
+          />
         )}
-        {/* ZNT choropleth */}
+        {/* Kelurahan name labels — overview chapter only */}
+        {chapter.id === 'overview' && Object.entries(DESA_CENTROIDS).map(([name, [lat, lng]]) => (
+          <Marker key={name} position={[lat, lng]} icon={L.divIcon({
+            html: `<div style="background:${DESA_COLORS[name]||'#94a3b8'};color:white;font-size:8.5px;font-weight:800;padding:3px 7px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.45);border:1.5px solid rgba(255,255,255,0.85);letter-spacing:0.5px;text-shadow:0 1px 2px rgba(0,0,0,.25);">${name==='NGAGELREJO'?'NGAGEL REJO':name}</div>`,
+            className: '', iconAnchor: [36, 11]
+          })} />
+        ))}
+        {/* ZNT choropleth — fade when simulation overlay active */}
         {chapter.showZNT && geoData.znt && (
-          <GeoJSON key={`znt-${chapter.id}`} data={geoData.znt}
-            style={(f) => { const s = getZntStyle(f); return { ...s, fillOpacity: 0.65 } }} />
+          <GeoJSON key={`znt-${chapter.id}-${simulationOn}`} data={geoData.znt}
+            style={(f) => { const s = getZntStyle(f); return { ...s, fillOpacity: simulationOn ? 0.22 : 0.65, opacity: simulationOn ? 0.4 : 1 } }} />
         )}
         {/* Dataset dots */}
         {chapter.showDataset && geoData.dataset && (
@@ -302,25 +427,25 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
           <GeoJSON key={`cbd-${chapter.id}`} data={geoData.cbd}
             pointToLayer={(_, ll) => L.marker(ll, { icon: facilityMarker('cbd', '#7c3aed', 24) })} />
         )}
-        {/* ── Simulation overlay (chapter 04 only) ── */}
-        {chapter.id === 'simulation' && simulationOn && (
+        {/* ── Simulation overlay: actual ZNT sub-polygons with upgraded zone colors ── */}
+        {chapter.id === 'simulation' && simulationOn && simZNT && (
           <>
-            {/* Impact zone polygon */}
-            <GeoJSON key="impact-zone" data={IMPACT_ZONE}
-              style={{ fillColor: '#16a34a', color: '#15803d', weight: 2, fillOpacity: 0.12, opacity: 0.8, dashArray: '8 4' }} />
+            {/* Upgraded zone polygons (real shapes, new zone colors) */}
+            <GeoJSON key="sim-znt-upgrade" data={simZNT}
+              style={(f) => {
+                const s = getZntStyle(f)
+                return { ...s, fillOpacity: 0.88, weight: 1.5, color: 'white', opacity: 0.7 }
+              }} />
             {/* Proposed new road */}
-            <GeoJSON key="proposed-road" data={PROPOSED_ROAD}
-              style={{ color: '#f59e0b', weight: 4, opacity: 0.95, dashArray: '10 5' }} />
-            {/* New faskes marker */}
-            <GeoJSON
-              key="new-faskes"
-              data={{ type: 'FeatureCollection', features: [{
+            <GeoJSON key="sim-road" data={{
+              type: 'FeatureCollection', features: [{
                 type: 'Feature',
-                geometry: { type: 'Point', coordinates: [NEW_FASKES_PT.lng, NEW_FASKES_PT.lat] },
+                geometry: { type: 'LineString', coordinates: SIM_ROAD_COORDS },
                 properties: {}
-              }]}}
-              pointToLayer={(_, ll) => L.marker(ll, { icon: newFaskesIcon })}
-            />
+              }]
+            }} style={{ color: '#f59e0b', weight: 4.5, opacity: 0.95, dashArray: '10 5' }} />
+            {/* New faskes marker */}
+            <Marker key="sim-faskes" position={[SIM_FASKES_LAT, SIM_FASKES_LNG]} icon={newFaskesIcon} />
           </>
         )}
 
@@ -351,38 +476,6 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
   )
 }
 
-/* ─── Proposed infrastructure GeoJSON (hardcoded simulation) ─── */
-const PROPOSED_ROAD = {
-  type: 'FeatureCollection',
-  features: [{
-    type: 'Feature',
-    geometry: {
-      type: 'LineString',
-      coordinates: [
-        [112.716, -7.293],[112.721, -7.290],[112.728, -7.289],
-        [112.736, -7.290],[112.744, -7.292],[112.749, -7.295],
-      ]
-    },
-    properties: { name: 'Rencana Jalan Kolektor Baru' }
-  }]
-}
-
-const IMPACT_ZONE = {
-  type: 'FeatureCollection',
-  features: [{
-    type: 'Feature',
-    geometry: {
-      type: 'Polygon',
-      coordinates: [[
-        [112.714, -7.287],[112.752, -7.287],[112.752, -7.302],
-        [112.714, -7.302],[112.714, -7.287],
-      ]]
-    },
-    properties: { name: 'Zona Terdampak' }
-  }]
-}
-
-const NEW_FASKES_PT = { lat: -7.292, lng: 112.733 }
 
 export default function StoryMap() {
   const [active, setActive] = useState(0)
