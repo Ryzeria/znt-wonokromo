@@ -4,7 +4,7 @@ import L from 'leaflet'
 import { Link } from 'react-router-dom'
 import { ArrowRight, Map, BarChart2, ChevronDown } from 'lucide-react'
 import { useGeoData } from '../hooks/useGeoData'
-import { getZntStyle } from '../utils'
+import { getZntStyle, getDesaColor, injectPopupStyles } from '../utils'
 import { ZNT_STYLE, MAP_CENTER } from '../config'
 import NavBar from '../components/NavBar'
 
@@ -77,14 +77,14 @@ L.Icon.Default.mergeOptions({
 const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const SAT_ATTR = '© Esri, DigitalGlobe, GeoEye'
 
-/* ─── Kelurahan visual data ─────────────────────────── */
+/* ─── Kelurahan visual data — density-based blues (consistent with WebGIS) ── */
 const DESA_COLORS = {
-  DARMO:        '#fbbf24',  // amber
-  NGAGEL:       '#34d399',  // emerald
-  JAGIR:        '#60a5fa',  // blue
-  NGAGELREJO:   '#f87171',  // red-pink
-  SAWUNGGALING: '#c084fc',  // purple
-  WONOKROMO:    '#fb923c',  // orange
+  WONOKROMO:    '#1d4ed8',  // kepadatan 34149 → getDesaColor >30000
+  NGAGELREJO:   '#3b82f6',  // kepadatan 27498 → getDesaColor >20000
+  JAGIR:        '#60a5fa',  // kepadatan 15358 → getDesaColor >15000
+  SAWUNGGALING: '#60a5fa',  // kepadatan 15056 → getDesaColor >15000
+  NGAGEL:       '#93c5fd',  // kepadatan 12994 → getDesaColor >10000
+  DARMO:        '#dbeafe',  // kepadatan 8531  → getDesaColor else
 }
 const DESA_CENTROIDS = {
   DARMO:        [-7.2873, 112.7345],
@@ -103,31 +103,21 @@ const DESA_INFO = {
   WONOKROMO:    { dens: 34149, luas: 2.04, note: 'Pusat kecamatan, kepadatan tertinggi' },
 }
 
-/* ─── Simulation helpers ────────────────────────────── */
-const SIM_ROAD_COORDS = [
-  [112.716, -7.293], [112.721, -7.290], [112.728, -7.289],
-  [112.736, -7.290], [112.744, -7.292], [112.749, -7.295],
-]
-const SIM_FASKES_LNG = 112.733
-const SIM_FASKES_LAT = -7.292
-const ROAD_THRESH  = 0.004  // ≈ 440m in degrees
-const FASKES_THRESH = 0.003  // ≈ 330m
+/* ─── Simulation point features ─────────────────────── */
+// Skenario: penambahan CBD baru (pusat perbelanjaan/komersial) + faskes baru
+// di wilayah yang saat ini kekurangan fasilitas (barat-tengah Wonokromo)
+const SIM_CBD_LNG  = 112.7245   // CBD baru — barat tengah, area ZNT I/II saat ini
+const SIM_CBD_LAT  = -7.3068
+const SIM_FASKES_LNG = 112.7198
+const SIM_FASKES_LAT = -7.3090
 
-function ptSeg2(px, py, ax, ay, bx, by) {
-  const dx = bx-ax, dy = by-ay
-  if (!dx && !dy) return (px-ax)**2 + (py-ay)**2
-  const t = Math.max(0, Math.min(1, ((px-ax)*dx + (py-ay)*dy)/(dx*dx+dy*dy)))
-  return (px-ax-t*dx)**2 + (py-ay-t*dy)**2
-}
-function distToSimRoad(lng, lat) {
-  let d2 = Infinity
-  for (let i = 0; i < SIM_ROAD_COORDS.length-1; i++)
-    d2 = Math.min(d2, ptSeg2(lng, lat, SIM_ROAD_COORDS[i][0], SIM_ROAD_COORDS[i][1], SIM_ROAD_COORDS[i+1][0], SIM_ROAD_COORDS[i+1][1]))
-  return Math.sqrt(d2)
-}
-function distToSimFaskes(lng, lat) {
-  const dx = (lng - SIM_FASKES_LNG) * 0.99
-  const dy = lat - SIM_FASKES_LAT
+const CBD_NEAR_THRESH  = 0.0015  // ~165m — dampak CBD kuat (bobot 35%): naik 2 zona
+const CBD_FAR_THRESH   = 0.0035  // ~390m — dampak CBD moderat: naik 1 zona
+const FASKES_THRESH    = 0.0028  // ~310m — dampak faskes (bobot 20%): naik 1 zona
+
+function simDist(lng, lat, refLng, refLat) {
+  const dx = (lng - refLng) * 0.992  // koreksi cos(lat ≈ -7°)
+  const dy = lat - refLat
   return Math.sqrt(dx*dx + dy*dy)
 }
 
@@ -143,15 +133,14 @@ const CHAPTERS = [
       { label: 'Penduduk',        value: '~248.000' },
       { label: 'Kepadatan',       value: '36.500/km²' },
     ],
-    body: 'Kecamatan Wonokromo terletak di bagian selatan pusat Kota Surabaya, mencakup 6 kelurahan dengan karakteristik spasial yang beragam. Dilintasi koridor Jalan Wonokromo sebagai arteri utama dan Kali Mas di sisi barat, kawasan ini memiliki dinamika nilai tanah yang sangat bervariasi. Klik kelurahan untuk melihat data detail.',
+    body: 'Kecamatan Wonokromo terletak di bagian selatan pusat Kota Surabaya, mencakup 6 kelurahan dengan karakteristik spasial yang beragam. Dilintasi koridor Jalan Wonokromo sebagai arteri utama dan Kali Mas di sisi barat, kawasan ini memiliki dinamika nilai tanah yang sangat bervariasi. Klik batas kelurahan untuk melihat data detail masing-masing wilayah.',
     showDesa: true, showZNT: false,
     legend: [
-      { type: 'desa-label', color: DESA_COLORS.DARMO,        label: 'Darmo' },
-      { type: 'desa-label', color: DESA_COLORS.NGAGEL,       label: 'Ngagel' },
-      { type: 'desa-label', color: DESA_COLORS.JAGIR,        label: 'Jagir' },
-      { type: 'desa-label', color: DESA_COLORS.NGAGELREJO,   label: 'Ngagel Rejo' },
-      { type: 'desa-label', color: DESA_COLORS.SAWUNGGALING, label: 'Sawunggaling' },
-      { type: 'desa-label', color: DESA_COLORS.WONOKROMO,    label: 'Wonokromo' },
+      { type: 'polygon', color: '#1d4ed8', label: '>30.000 jiwa/km² (Wonokromo)',  opacity: 0.7 },
+      { type: 'polygon', color: '#3b82f6', label: '>20.000 jiwa/km² (Ngagel Rejo)', opacity: 0.7 },
+      { type: 'polygon', color: '#60a5fa', label: '>15.000 jiwa/km² (Jagir, Sawung.)', opacity: 0.7 },
+      { type: 'polygon', color: '#93c5fd', label: '>10.000 jiwa/km² (Ngagel)',     opacity: 0.7 },
+      { type: 'polygon', color: '#dbeafe', label: '<10.000 jiwa/km² (Darmo)',       opacity: 0.7 },
     ],
   },
   {
@@ -205,19 +194,19 @@ const CHAPTERS = [
     id: 'simulation', badge: '04', color: '#7c3aed',
     title: 'Simulasi Skenario',
     subtitle: 'Dampak Pengembangan Infrastruktur',
-    center: [-7.307, 112.728], zoom: 14,
+    center: [-7.307, 112.726], zoom: 14,
     stats: [
-      { label: 'Kenaikan ZNT (jalan +1km)', value: '+12–18%' },
-      { label: 'Kenaikan ZNT (faskes baru)', value: '+5–8%' },
-      { label: 'Zona Terdampak', value: '±320 ha' },
-      { label: 'Radius Buffer Analisis', value: '100–500 m' },
+      { label: 'Kenaikan Skor ZNT (CBD Baru)', value: '+15–25%' },
+      { label: 'Kenaikan ZNT (Faskes Baru)',   value: '+5–8%' },
+      { label: 'Zona Terdampak Positif',        value: '±240 ha' },
+      { label: 'Radius Analisis (CBD)', value: '165–390 m' },
     ],
-    body: 'Simulasi menunjukkan penambahan 1 km jalan kolektor di area defisit aksesibilitas berpotensi meningkatkan skor ZNT 12–18% pada radius 300m. Pembangunan fasilitas kesehatan baru berdampak lebih moderat namun menjangkau wilayah lebih luas. Model ini dapat menjadi dasar perencanaan tata ruang berbasis data.',
+    body: 'Simulasi menunjukkan penambahan titik CBD baru (pusat perbelanjaan/komersial) di wilayah yang belum terlayani berpotensi meningkatkan skor ZNT 15–25% pada radius 165m dan 8–12% pada radius 390m, mengikuti bobot AHP CBD tertinggi (35%). Penambahan faskes baru memberikan dampak tambahan 5–8%. Aktifkan skenario untuk melihat perubahan zona secara spasial.',
     showZNT: true, showJalan: true, showSungai: true,
     legend: [
       { type: 'znt-all', label: 'Zona Nilai Tanah (ZNT)' },
-      { type: 'line', color: '#dc2626', label: 'Jalan Kolektor', weight: 2.5 },
-      { type: 'line', color: '#0369a1', label: 'Sungai', weight: 2 },
+      { type: 'facility', color: '#7c3aed', layerId: 'cbd',    label: 'CBD Rencana (Baru)' },
+      { type: 'facility', color: '#16a34a', layerId: 'faskes', label: 'Faskes Rencana (Baru)' },
     ],
   },
   {
@@ -320,30 +309,32 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
     className: '', iconAnchor: [14, 14]
   })
 
-  /* ── Simulated ZNT upgrade: filter actual ZNT sub-polygons near proposed infra ── */
+  /* ── Inject WebGIS popup CSS ── */
+  useEffect(() => { injectPopupStyles() }, [])
+
+  /* ── Simulated ZNT: upgrade sub-polygons near new CBD + faskes ── */
   const simZNT = useMemo(() => {
     if (!geoData.znt || !simulationOn) return null
     const upgraded = []
     geoData.znt.features.forEach(f => {
       const zona = f.properties?.zona_id
-      if (zona > 2 || f.geometry.type !== 'MultiPolygon') return
+      if (zona > 3 || f.geometry.type !== 'MultiPolygon') return
       f.geometry.coordinates.forEach(polyCoords => {
         const ring = polyCoords[0]
         const lats = ring.map(c => c[1]); const lngs = ring.map(c => c[0])
         const clat = (Math.min(...lats) + Math.max(...lats)) / 2
         const clng = (Math.min(...lngs) + Math.max(...lngs)) / 2
-        const dRoad = distToSimRoad(clng, clat)
-        const dFaskes = distToSimFaskes(clng, clat)
-        const inRoad = dRoad < ROAD_THRESH
-        const inFaskes = dFaskes < FASKES_THRESH
-        if (!inRoad && !inFaskes) return
-        let newZona = zona
-        if (zona === 1) newZona = (inFaskes && dFaskes < FASKES_THRESH * 0.6) ? 3 : 2
-        if (zona === 2) newZona = (inFaskes && dFaskes < FASKES_THRESH * 0.8) ? 3 : 3
+        const dCBD    = simDist(clng, clat, SIM_CBD_LNG, SIM_CBD_LAT)
+        const dFaskes = simDist(clng, clat, SIM_FASKES_LNG, SIM_FASKES_LAT)
+        let boost = 0
+        if (dCBD < CBD_NEAR_THRESH) boost = Math.max(boost, 2)
+        else if (dCBD < CBD_FAR_THRESH) boost = Math.max(boost, 1)
+        if (dFaskes < FASKES_THRESH) boost = Math.max(boost, 1)
+        if (boost === 0) return
         upgraded.push({
           type: 'Feature',
           geometry: { type: 'Polygon', coordinates: polyCoords },
-          properties: { ...f.properties, zona_id: newZona, _sim: true },
+          properties: { ...f.properties, zona_id: Math.min(zona + boost, 5), _sim: true },
         })
       })
     })
@@ -359,38 +350,44 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
         {/* Satellite basemap */}
         <TileLayer url={SAT_URL} attribution={SAT_ATTR} maxZoom={19} />
 
-        {/* Desa layer — chapter 1: colored fill + labels; others: outline only */}
+        {/* Desa layer — chapter 1: density choropleth + popups; others: dashed outline */}
         {chapter.showDesa && geoData.desa && (
           <GeoJSON key={`desa-${chapter.id}`} data={geoData.desa}
             style={(f) => {
-              const n = f.properties?.NAMOBJ || ''
-              const fill = DESA_COLORS[n] || '#94a3b8'
-              if (chapter.id === 'overview') return { fillColor: fill, fillOpacity: 0.28, color: '#fff', weight: 2.5, opacity: 0.9 }
-              return { fillColor: 'transparent', color: '#3b82f6', weight: 2, opacity: 0.75, dashArray: '4 2' }
+              const dens = f.properties?.Kepadatan || 0
+              const fill = getDesaColor(dens)
+              if (chapter.id === 'overview')
+                return { fillColor: fill, fillOpacity: 0.35, color: '#fff', weight: 2.5, opacity: 0.85 }
+              return { fillColor: 'transparent', color: '#3b82f6', weight: 1.5, opacity: 0.7, dashArray: '4 2' }
             }}
             onEachFeature={(f, layer) => {
               if (chapter.id !== 'overview') return
-              const n = f.properties?.NAMOBJ || ''
+              const p = f.properties || {}
+              const n = p.NAMOBJ || ''
               const info = DESA_INFO[n] || {}
               const display = n === 'NGAGELREJO' ? 'Ngagel Rejo' : n.charAt(0) + n.slice(1).toLowerCase()
-              const pop = Math.round((info.dens || 0) * (info.luas || 0))
-              layer.bindPopup(`<div style="font-family:sans-serif;min-width:155px;padding:4px 0">
-                <div style="font-weight:800;font-size:13px;color:#1e293b;margin-bottom:6px;border-bottom:2px solid ${DESA_COLORS[n] || '#94a3b8'};padding-bottom:4px">${display}</div>
-                <div style="font-size:11px;color:#475569;line-height:2">
-                  <div>Kepadatan: <b style="color:#1e293b">${(info.dens||0).toLocaleString('id-ID')}/km²</b></div>
-                  <div>Luas est.: <b style="color:#1e293b">${info.luas||'–'} km²</b></div>
-                  <div>Penduduk est.: <b style="color:#1e293b">~${(pop/1000).toFixed(1)}k jiwa</b></div>
-                  <div style="color:#94a3b8;font-size:10px;margin-top:3px">${info.note||''}</div>
+              const pop = Math.round((p.Kepadatan || info.dens || 0) * (info.luas || 0))
+              const fill = getDesaColor(p.Kepadatan || info.dens || 0)
+              layer.bindPopup(`<div class="pp-card">
+                <div class="pp-head" style="background:${fill}">
+                  <span class="pp-title" style="color:${p.Kepadatan>15000?'#fff':'#1e3a8a'}">Kel. ${display}</span>
                 </div>
-              </div>`, { maxWidth: 210 })
+                <div class="pp-body">
+                  <div class="pp-row"><span>Kepadatan</span><b>${(p.Kepadatan||info.dens||0).toLocaleString('id-ID')} jiwa/km²</b></div>
+                  <div class="pp-row"><span>Luas Estimasi</span><b>${info.luas||'–'} km²</b></div>
+                  <div class="pp-row"><span>Penduduk Est.</span><b>~${(pop/1000).toFixed(1)} ribu jiwa</b></div>
+                  <div class="pp-row"><span>Kecamatan</span><b>${p.WADMKC||'Wonokromo'}</b></div>
+                  <div class="pp-row"><span>Karakter Wilayah</span><b>${info.note||'–'}</b></div>
+                </div>
+              </div>`, { maxWidth: 240 })
             }}
           />
         )}
-        {/* Kelurahan name labels — overview chapter only */}
+        {/* Kelurahan labels — clean minimal white label, overview only */}
         {chapter.id === 'overview' && Object.entries(DESA_CENTROIDS).map(([name, [lat, lng]]) => (
           <Marker key={name} position={[lat, lng]} icon={L.divIcon({
-            html: `<div style="background:${DESA_COLORS[name]||'#94a3b8'};color:white;font-size:8.5px;font-weight:800;padding:3px 7px;border-radius:5px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.45);border:1.5px solid rgba(255,255,255,0.85);letter-spacing:0.5px;text-shadow:0 1px 2px rgba(0,0,0,.25);">${name==='NGAGELREJO'?'NGAGEL REJO':name}</div>`,
-            className: '', iconAnchor: [36, 11]
+            html: `<div style="background:rgba(255,255,255,0.92);color:#0f172a;font-size:8px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.28);border:1px solid rgba(0,0,0,.12);letter-spacing:0.4px;">${name==='NGAGELREJO'?'Ngagel Rejo':name.charAt(0)+name.slice(1).toLowerCase()}</div>`,
+            className: '', iconAnchor: [36, 10]
           })} />
         ))}
         {/* ZNT choropleth — fade when simulation overlay active */}
@@ -427,24 +424,19 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
           <GeoJSON key={`cbd-${chapter.id}`} data={geoData.cbd}
             pointToLayer={(_, ll) => L.marker(ll, { icon: facilityMarker('cbd', '#7c3aed', 24) })} />
         )}
-        {/* ── Simulation overlay: actual ZNT sub-polygons with upgraded zone colors ── */}
+        {/* ── Simulation overlay: upgraded ZNT parcels + new CBD + faskes point ── */}
         {chapter.id === 'simulation' && simulationOn && simZNT && (
           <>
-            {/* Upgraded zone polygons (real shapes, new zone colors) */}
+            {/* Real ZNT parcels re-colored to upgraded zone */}
             <GeoJSON key="sim-znt-upgrade" data={simZNT}
               style={(f) => {
                 const s = getZntStyle(f)
-                return { ...s, fillOpacity: 0.88, weight: 1.5, color: 'white', opacity: 0.7 }
+                return { ...s, fillOpacity: 0.9, weight: 1, color: 'rgba(255,255,255,0.6)', opacity: 0.8 }
               }} />
-            {/* Proposed new road */}
-            <GeoJSON key="sim-road" data={{
-              type: 'FeatureCollection', features: [{
-                type: 'Feature',
-                geometry: { type: 'LineString', coordinates: SIM_ROAD_COORDS },
-                properties: {}
-              }]
-            }} style={{ color: '#f59e0b', weight: 4.5, opacity: 0.95, dashArray: '10 5' }} />
-            {/* New faskes marker */}
+            {/* New CBD marker (purple — same style as existing CBD layer) */}
+            <Marker key="sim-cbd" position={[SIM_CBD_LAT, SIM_CBD_LNG]}
+              icon={facilityMarker('cbd', '#7c3aed', 28)} />
+            {/* New faskes marker (green) */}
             <Marker key="sim-faskes" position={[SIM_FASKES_LAT, SIM_FASKES_LNG]} icon={newFaskesIcon} />
           </>
         )}
@@ -601,15 +593,14 @@ export default function StoryMap() {
 
                   {/* Before/After comparison */}
                   <div className="grid grid-cols-2 gap-3 mb-4">
-                    {/* Before */}
-                    <div className={`rounded-xl border p-3 transition-all ${!simulationOn ? 'border-slate-300 bg-slate-50' : 'border-slate-100 opacity-60'}`}>
+                    <div className={`rounded-xl border p-3 transition-all ${!simulationOn ? 'border-slate-300 bg-slate-50' : 'border-slate-100 opacity-55'}`}>
                       <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Kondisi Saat Ini</p>
                       <div className="space-y-1.5">
                         {[
                           { l: 'Dominan Zona', v: 'ZNT I–II' },
-                          { l: 'Rata-rata Skor', v: '0.245' },
-                          { l: 'NT Area Utara', v: '~Rp 5.8 jt/m²' },
-                          { l: 'Aksesibilitas', v: 'Terbatas' },
+                          { l: 'Skor Komposit', v: '0.225–0.265' },
+                          { l: 'NT Area Barat', v: '~Rp 5.5 jt/m²' },
+                          { l: 'Fasilitas CBD', v: 'Tidak ada' },
                         ].map(({ l, v }) => (
                           <div key={l} className="flex justify-between text-[10px]">
                             <span className="text-slate-500">{l}</span>
@@ -618,60 +609,55 @@ export default function StoryMap() {
                         ))}
                       </div>
                     </div>
-                    {/* After */}
-                    <div className={`rounded-xl border p-3 transition-all ${simulationOn ? 'border-emerald-300 bg-emerald-50' : 'border-slate-100 opacity-60'}`}>
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 mb-2">Setelah Pengembangan</p>
+                    <div className={`rounded-xl border p-3 transition-all ${simulationOn ? 'border-violet-300 bg-violet-50' : 'border-slate-100 opacity-55'}`}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-violet-500 mb-2">Setelah Pengembangan</p>
                       <div className="space-y-1.5">
                         {[
                           { l: 'Proyeksi Zona', v: 'ZNT II–III' },
-                          { l: 'Rata-rata Skor', v: '0.287 (+17%)' },
-                          { l: 'NT Proyeksi', v: '~Rp 7.2 jt/m²' },
-                          { l: 'Aksesibilitas', v: 'Meningkat' },
+                          { l: 'Skor Komposit', v: '0.287 (+20%)' },
+                          { l: 'NT Proyeksi', v: '~Rp 7.5 jt/m²' },
+                          { l: 'Fasilitas CBD', v: '+1 titik baru' },
                         ].map(({ l, v }) => (
                           <div key={l} className="flex justify-between text-[10px]">
                             <span className="text-slate-500">{l}</span>
-                            <span className="font-semibold text-emerald-700">{v}</span>
+                            <span className="font-semibold text-violet-700">{v}</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Infrastructure legend for after state */}
+                  {/* Fasilitas baru legend */}
                   {simulationOn && (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 mb-2">Infrastruktur Baru (Peta)</p>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 flex-shrink-0 flex items-center">
-                          <div className="w-full border-t-2 border-dashed border-amber-500" />
+                    <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3 space-y-2">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-violet-600 mb-2">Fasilitas Baru (Peta)</p>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-5 h-5 rounded-full flex-shrink-0 bg-violet-700 border-2 border-white flex items-center justify-center shadow-sm">
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="white"><rect x="2" y="3.5" width="8" height="8.5" rx="0.5"/><path d="M1.5 3.5L6 0.5l4.5 3" fill="white"/><rect x="3.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/><rect x="6.5" y="5.5" width="2" height="2" rx="0.3" fill="#7c3aed"/></svg>
                         </div>
-                        <span className="text-[10px] text-slate-600">Rencana Jalan Kolektor Baru (~1.2 km)</span>
+                        <span className="text-[10px] text-slate-700">CBD Baru — Pusat Perbelanjaan (bobot 35%)</span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <div className="w-5 h-5 rounded-full flex-shrink-0 bg-emerald-600 border-2 border-white flex items-center justify-center shadow-sm">
                           <svg width="10" height="10" viewBox="0 0 12 12" fill="white"><rect x="4.5" y="0" width="3" height="12" rx="1"/><rect x="0" y="4.5" width="12" height="3" rx="1"/></svg>
                         </div>
-                        <span className="text-[10px] text-slate-600">Faskes Baru (Klinik Pratama)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-3 rounded flex-shrink-0" style={{ background: '#16a34a', opacity: 0.25, border: '1.5px dashed #15803d' }} />
-                        <span className="text-[10px] text-slate-600">Zona terdampak (±320 ha, radius 300m)</span>
+                        <span className="text-[10px] text-slate-700">Faskes Baru — Klinik Pratama (bobot 20%)</span>
                       </div>
                     </div>
                   )}
 
                   {/* Key insights */}
-                  <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
-                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">Temuan Simulasi</p>
+                  <div className="mt-3 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-slate-700 mb-1.5">Temuan Simulasi (Model AHP)</p>
                     <ul className="space-y-0.5">
                       {[
-                        '+12–18% kenaikan skor ZNT di radius 300m jalan baru',
-                        '+5–8% dampak penambahan faskes baru terhadap skor',
-                        '±320 ha wilayah terdampak positif (ZNT I→II, II→III)',
-                        'Estimasi kenaikan NT: Rp 1.4–2.6 jt/m² dalam 3–5 tahun',
-                      ].map((item, i) => (
-                        <li key={i} className="text-[10px] text-blue-700 flex items-start gap-1.5">
-                          <span className="text-blue-400 flex-shrink-0 mt-0.5">▸</span>{item}
+                        'CBD baru: +15–25% skor ZNT radius 165m, +8–12% radius 390m',
+                        'Faskes baru: +5–8% skor ZNT pada radius 310m',
+                        '±240 ha wilayah terdampak positif (ZNT I→II, II→III)',
+                        'Estimasi kenaikan NT: Rp 2–4 jt/m² dalam 3–5 tahun',
+                      ].map((item, idx) => (
+                        <li key={idx} className="text-[10px] text-slate-600 flex items-start gap-1.5">
+                          <span className="text-slate-400 flex-shrink-0 mt-0.5">▸</span>{item}
                         </li>
                       ))}
                     </ul>
