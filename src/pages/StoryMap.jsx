@@ -77,14 +77,14 @@ L.Icon.Default.mergeOptions({
 const SAT_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const SAT_ATTR = '© Esri, DigitalGlobe, GeoEye'
 
-/* ─── Kelurahan visual data — density-based blues (consistent with WebGIS) ── */
+/* ─── Kelurahan visual data — distinct color per kelurahan ── */
 const DESA_COLORS = {
-  WONOKROMO:    '#1d4ed8',  // kepadatan 34149 → getDesaColor >30000
-  NGAGELREJO:   '#3b82f6',  // kepadatan 27498 → getDesaColor >20000
-  JAGIR:        '#60a5fa',  // kepadatan 15358 → getDesaColor >15000
-  SAWUNGGALING: '#60a5fa',  // kepadatan 15056 → getDesaColor >15000
-  NGAGEL:       '#93c5fd',  // kepadatan 12994 → getDesaColor >10000
-  DARMO:        '#dbeafe',  // kepadatan 8531  → getDesaColor else
+  WONOKROMO:    '#1d4ed8',  // biru
+  NGAGEL:       '#7c3aed',  // ungu
+  JAGIR:        '#059669',  // hijau
+  NGAGELREJO:   '#ea580c',  // oranye
+  SAWUNGGALING: '#ca8a04',  // kuning-amber
+  DARMO:        '#0891b2',  // cyan
 }
 const DESA_CENTROIDS = {
   DARMO:        [-7.2873, 112.7345],
@@ -136,11 +136,12 @@ const CHAPTERS = [
     body: 'Kecamatan Wonokromo terletak di bagian selatan pusat Kota Surabaya, mencakup 6 kelurahan dengan karakteristik spasial yang beragam. Dilintasi koridor Jalan Wonokromo sebagai arteri utama dan Kali Mas di sisi barat, kawasan ini memiliki dinamika nilai tanah yang sangat bervariasi. Klik batas kelurahan untuk melihat data detail masing-masing wilayah.',
     showDesa: true, showZNT: false,
     legend: [
-      { type: 'polygon', color: '#1d4ed8', label: '>30.000 jiwa/km² (Wonokromo)',  opacity: 0.7 },
-      { type: 'polygon', color: '#3b82f6', label: '>20.000 jiwa/km² (Ngagel Rejo)', opacity: 0.7 },
-      { type: 'polygon', color: '#60a5fa', label: '>15.000 jiwa/km² (Jagir, Sawung.)', opacity: 0.7 },
-      { type: 'polygon', color: '#93c5fd', label: '>10.000 jiwa/km² (Ngagel)',     opacity: 0.7 },
-      { type: 'polygon', color: '#dbeafe', label: '<10.000 jiwa/km² (Darmo)',       opacity: 0.7 },
+      { type: 'polygon', color: '#1d4ed8', label: 'Wonokromo',    opacity: 0.7 },
+      { type: 'polygon', color: '#7c3aed', label: 'Ngagel',       opacity: 0.7 },
+      { type: 'polygon', color: '#059669', label: 'Jagir',        opacity: 0.7 },
+      { type: 'polygon', color: '#ea580c', label: 'Ngagel Rejo',  opacity: 0.7 },
+      { type: 'polygon', color: '#ca8a04', label: 'Sawunggaling', opacity: 0.7 },
+      { type: 'polygon', color: '#0891b2', label: 'Darmo',        opacity: 0.7 },
     ],
   },
   {
@@ -354,10 +355,10 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
         {chapter.showDesa && geoData.desa && (
           <GeoJSON key={`desa-${chapter.id}`} data={geoData.desa}
             style={(f) => {
-              const dens = f.properties?.Kepadatan || 0
-              const fill = getDesaColor(dens)
+              const n = f.properties?.NAMOBJ || ''
+              const fill = DESA_COLORS[n] || '#94a3b8'
               if (chapter.id === 'overview')
-                return { fillColor: fill, fillOpacity: 0.35, color: '#fff', weight: 2.5, opacity: 0.85 }
+                return { fillColor: fill, fillOpacity: 0.45, color: '#fff', weight: 2.5, opacity: 0.85 }
               return { fillColor: 'transparent', color: '#3b82f6', weight: 1.5, opacity: 0.7, dashArray: '4 2' }
             }}
             onEachFeature={(f, layer) => {
@@ -367,10 +368,10 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
               const info = DESA_INFO[n] || {}
               const display = n === 'NGAGELREJO' ? 'Ngagel Rejo' : n.charAt(0) + n.slice(1).toLowerCase()
               const pop = Math.round((p.Kepadatan || info.dens || 0) * (info.luas || 0))
-              const fill = getDesaColor(p.Kepadatan || info.dens || 0)
+              const fill = DESA_COLORS[n] || '#94a3b8'
               layer.bindPopup(`<div class="pp-card">
                 <div class="pp-head" style="background:${fill}">
-                  <span class="pp-title" style="color:${p.Kepadatan>15000?'#fff':'#1e3a8a'}">Kel. ${display}</span>
+                  <span class="pp-title" style="color:#fff">Kel. ${display}</span>
                 </div>
                 <div class="pp-body">
                   <div class="pp-row"><span>Kepadatan</span><b>${(p.Kepadatan||info.dens||0).toLocaleString('id-ID')} jiwa/km²</b></div>
@@ -386,8 +387,8 @@ function StoryMap_Map({ chapter, geoData, simulationOn }) {
         {/* Kelurahan labels — clean minimal white label, overview only */}
         {chapter.id === 'overview' && Object.entries(DESA_CENTROIDS).map(([name, [lat, lng]]) => (
           <Marker key={name} position={[lat, lng]} icon={L.divIcon({
-            html: `<div style="background:rgba(255,255,255,0.92);color:#0f172a;font-size:8px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 5px rgba(0,0,0,.28);border:1px solid rgba(0,0,0,.12);letter-spacing:0.4px;">${name==='NGAGELREJO'?'Ngagel Rejo':name.charAt(0)+name.slice(1).toLowerCase()}</div>`,
-            className: '', iconAnchor: [36, 10]
+            html: `<span style="color:#fff;font-size:9px;font-weight:800;white-space:nowrap;letter-spacing:0.5px;text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.8),1px 1px 0 rgba(0,0,0,.6);pointer-events:none;">${name==='NGAGELREJO'?'Ngagel Rejo':name.charAt(0)+name.slice(1).toLowerCase()}</span>`,
+            className: '', iconAnchor: [28, 6]
           })} />
         ))}
         {/* ZNT choropleth — fade when simulation overlay active */}
