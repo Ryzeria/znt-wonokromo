@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import ChatBot from './components/ChatBot'
 
 const Landing   = lazy(() => import('./pages/Landing'))
 const WebGIS    = lazy(() => import('./pages/WebGIS'))
@@ -17,16 +18,24 @@ function PageSpinner() {
   )
 }
 
-export default function App() {
+function AppContent() {
+  const { pathname } = useLocation()
   return (
-    <Suspense fallback={<PageSpinner />}>
-      <Routes>
-        <Route path="/"          element={<Landing />} />
-        <Route path="/webgis"    element={<WebGIS />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/storymap"  element={<StoryMap />} />
-        <Route path="*"          element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+    <>
+      <Suspense fallback={<PageSpinner />}>
+        <Routes>
+          <Route path="/"          element={<Landing />} />
+          <Route path="/webgis"    element={<WebGIS />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/storymap"  element={<StoryMap />} />
+          <Route path="*"          element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+      {pathname !== '/webgis' && <ChatBot />}
+    </>
   )
+}
+
+export default function App() {
+  return <AppContent />
 }

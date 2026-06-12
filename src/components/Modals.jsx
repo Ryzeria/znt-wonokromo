@@ -28,6 +28,81 @@ function Modal({ title, onClose, children, wide }) {
   )
 }
 
+/* ─── Basemap thumbnail styles ──────────────────────── */
+const BASEMAP_THUMB = {
+  'osm':             { bg: 'linear-gradient(135deg,#b8d8a8 0%,#f5f0e0 55%,#e0d8c8 100%)', type: 'street' },
+  'positron':        { bg: 'linear-gradient(135deg,#f8f8f8 0%,#eaeaea 100%)',               type: 'minimal' },
+  'voyager':         { bg: 'linear-gradient(135deg,#ddeeff 0%,#eef4ee 100%)',               type: 'street' },
+  'dark':            { bg: 'linear-gradient(135deg,#1a1f2e 0%,#0d1117 100%)',               type: 'dark' },
+  'esri-sat':        { bg: 'linear-gradient(135deg,#2d5a1b 0%,#1a3d12 55%,#3d6e1f 100%)',  type: 'sat' },
+  'esri-street':     { bg: 'linear-gradient(135deg,#faf5ea 0%,#e8e4d8 100%)',               type: 'street' },
+  'esri-topo':       { bg: 'linear-gradient(135deg,#b8d4a8 0%,#d4c898 55%,#c8d0a0 100%)', type: 'topo' },
+  'esri-gray':       { bg: 'linear-gradient(135deg,#d8d8d8 0%,#c0c0c0 100%)',               type: 'minimal' },
+  'google-road':     { bg: 'linear-gradient(135deg,#f5f5f5 0%,#e8f4d0 70%,#f0f0f0 100%)', type: 'street' },
+  'google-sat':      { bg: 'linear-gradient(135deg,#1e4d0f 0%,#2a5c1a 55%,#3a6e1e 100%)', type: 'sat' },
+  'google-hybrid':   { bg: 'linear-gradient(135deg,#1e4d0f 0%,#1a2a3a 70%,#2a3d52 100%)', type: 'hybrid' },
+  'google-terrain':  { bg: 'linear-gradient(135deg,#c8e0b0 0%,#e0d090 55%,#d0c880 100%)', type: 'topo' },
+  'otm':             { bg: 'linear-gradient(135deg,#d8ecca 0%,#c8c890 55%,#b8d4b8 100%)', type: 'topo' },
+}
+
+function BasemapThumb({ id }) {
+  const t = BASEMAP_THUMB[id] || { bg: 'linear-gradient(135deg,#e2e8f0,#cbd5e1)', type: 'minimal' }
+  const dark = t.type === 'dark' || t.type === 'hybrid'
+  const road = ['street','minimal'].includes(t.type)
+  const sat  = ['sat','hybrid'].includes(t.type)
+  const topo = t.type === 'topo'
+  const stroke = dark ? 'rgba(60,120,255,0.7)' : road ? 'rgba(100,80,50,0.35)' : sat ? 'rgba(100,160,70,0.4)' : 'rgba(120,100,60,0.35)'
+  const fill   = dark ? 'rgba(60,120,255,0.2)' : road ? 'rgba(200,185,160,0.4)' : sat ? 'rgba(60,100,40,0.35)' : 'rgba(180,160,100,0.3)'
+
+  return (
+    <div className="w-full h-12 rounded-lg overflow-hidden relative" style={{ background: t.bg }}>
+      <svg viewBox="0 0 60 40" className="absolute inset-0 w-full h-full" preserveAspectRatio="xMidYMid slice">
+        {/* Road-style pattern */}
+        {road && <>
+          <line x1="0" y1="20" x2="60" y2="20" stroke={stroke} strokeWidth="2.5"/>
+          <line x1="22" y1="0" x2="22" y2="40" stroke={stroke} strokeWidth="1.5"/>
+          <rect x="26" y="6" width="14" height="10" fill={fill} rx="1"/>
+          <rect x="5"  y="24" width="12" height="8"  fill={fill} rx="1"/>
+          <rect x="40" y="23" width="16" height="9"  fill={fill} rx="1"/>
+        </>}
+        {/* Satellite pattern */}
+        {sat && <>
+          <rect x="0"  y="0"  width="28" height="22" fill="rgba(70,110,40,0.25)" />
+          <rect x="28" y="0"  width="32" height="18" fill="rgba(50,90,30,0.25)" />
+          <rect x="0"  y="22" width="35" height="18" fill="rgba(60,100,35,0.25)" />
+          <rect x="35" y="18" width="25" height="22" fill="rgba(80,120,45,0.25)" />
+          {t.type === 'hybrid' && <>
+            <line x1="0" y1="20" x2="60" y2="20" stroke="rgba(255,210,80,0.8)" strokeWidth="1.5"/>
+            <line x1="25" y1="0" x2="25" y2="40" stroke="rgba(255,210,80,0.6)" strokeWidth="1"/>
+          </>}
+        </>}
+        {/* Topo pattern */}
+        {topo && <>
+          <path d="M0 35 L12 18 L22 26 L32 10 L42 20 L52 12 L60 18" stroke={stroke} strokeWidth="1.5" fill="none"/>
+          <path d="M0 38 L12 22 L22 30 L32 14 L42 24 L52 16 L60 22" stroke={stroke} strokeWidth="0.8" fill="none" opacity="0.6"/>
+          <path d="M5 40 L15 25 L25 32 L35 17 L45 27 L55 19" stroke={stroke} strokeWidth="0.5" fill="none" opacity="0.4"/>
+        </>}
+        {/* Dark pattern */}
+        {dark && <>
+          <line x1="0" y1="20" x2="60" y2="20" stroke="rgba(80,140,255,0.7)" strokeWidth="1.8"/>
+          <line x1="25" y1="0" x2="25" y2="40" stroke="rgba(80,140,255,0.5)" strokeWidth="1.2"/>
+          <circle cx="20" cy="16" r="2.5" fill="rgba(100,220,130,0.8)"/>
+          <circle cx="38" cy="26" r="2"   fill="rgba(100,220,130,0.7)"/>
+          <circle cx="48" cy="14" r="1.5" fill="rgba(255,200,80,0.7)"/>
+          <line x1="0" y1="29" x2="60" y2="29" stroke="rgba(80,140,255,0.25)" strokeWidth="1"/>
+        </>}
+        {/* Minimal pattern */}
+        {t.type === 'minimal' && <>
+          <line x1="0" y1="20" x2="60" y2="20" stroke="rgba(150,150,150,0.4)" strokeWidth="1.5"/>
+          <line x1="20" y1="0" x2="20" y2="40" stroke="rgba(150,150,150,0.3)" strokeWidth="1"/>
+          <rect x="24" y="8" width="12" height="8" fill="rgba(200,200,200,0.4)" rx="1"/>
+          <rect x="5"  y="23" width="10" height="7" fill="rgba(200,200,200,0.4)" rx="1"/>
+        </>}
+      </svg>
+    </div>
+  )
+}
+
 /* ─── Basemap modal ─────────────────────────────────── */
 export function BasemapModal({ active, onSelect, onClose, t }) {
   const groups = [...new Set(BASEMAPS.map(b => b.group))]
@@ -46,7 +121,7 @@ export function BasemapModal({ active, onSelect, onClose, t }) {
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
                       : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700'
                     }`}>
-                  <div className="w-full h-12 rounded-lg bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800 overflow-hidden" />
+                  <BasemapThumb id={bm.id} />
                   <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 leading-tight text-center w-full">{bm.name}</span>
                   {active === bm.id && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                 </button>
@@ -156,9 +231,7 @@ export function ExportModal({ onClose, t, map }) {
     <Modal title={t.exportMap} onClose={onClose}>
       <div className="p-5 space-y-3">
         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-          {t === 'id'
-            ? 'Ekspor tampilan peta saat ini ke dalam format file.'
-            : 'Export the current map view to a file format.'}
+          {t.exportMap}: Simpan tampilan peta saat ini dalam format file.
         </p>
         <button onClick={exportPng}
           className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors">

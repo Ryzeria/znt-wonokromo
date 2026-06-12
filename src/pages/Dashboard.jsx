@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, Cell, ReferenceLine, Legend, ComposedChart, Line,
@@ -7,7 +7,7 @@ import {
 } from 'recharts'
 import { useGeoData } from '../hooks/useGeoData'
 import NavBar from '../components/NavBar'
-import { TrendingUp, Hash, ArrowDownRight, Target, Activity, BarChart2, Info, TrendingDown } from 'lucide-react'
+import { TrendingUp, Hash, ArrowDownRight, Target, Activity, BarChart2, Info, TrendingDown, Download } from 'lucide-react'
 
 /* ─── ZNT Zone constants ────────────────────────────── */
 const ZNT_ZONES = [
@@ -177,9 +177,20 @@ const TABS = [
   { id: 'distribusi', label: 'Distribusi' },
   { id: 'zonasi',     label: 'Per Zona' },
   { id: 'korelasi',   label: 'Korelasi' },
+  { id: 'kelurahan',  label: 'Per Kelurahan' },
   { id: 'tren',       label: 'Tren Harga' },
   { id: 'tabel',      label: 'Tabel' },
 ]
+
+/* ─── Kelurahan colors ──────────────────────────────── */
+const KEL_COLORS = {
+  'Wonokromo':   '#2563eb',
+  'Ngagel':      '#7c3aed',
+  'Jagir':       '#059669',
+  'Ngagel Rejo': '#d97706',
+  'Sawunggaling':'#dc2626',
+  'Darmo':       '#0891b2',
+}
 
 export default function Dashboard() {
   const geoData = useGeoData(['dataset', 'znt'])
@@ -291,6 +302,51 @@ export default function Dashboard() {
     return entry
   }), [])
 
+  /* ── Per-kelurahan stats from dataset ── */
+  const kelurahanData = useMemo(() => {
+    if (!geoData.dataset?.features) return []
+    const groups = {}
+    geoData.dataset.features.forEach(f => {
+      const kel = f.properties?.Kelurahan || 'Lainnya'
+      const h = f.properties?.Harga || 0
+      if (!groups[kel]) groups[kel] = []
+      if (h > 0) groups[kel].push(h)
+    })
+    return Object.entries(groups).map(([kel, px]) => ({
+      name: kel,
+      n: px.length,
+      min: Math.min(...px),
+      max: Math.max(...px),
+      avg: Math.round(mean(px)),
+      median: Math.round(median(px)),
+      std: Math.round(stddev(px)),
+      cod: px.length >= 2 ? cod(px) : null,
+      fill: KEL_COLORS[kel] || '#64748b',
+    })).sort((a, b) => b.avg - a.avg)
+  }, [geoData.dataset])
+
+  /* ── CSV Export ── */
+  const exportCSV = useCallback(() => {
+    if (!geoData.dataset?.features) return
+    const headers = ['No','Kelurahan','Harga (Rp/m²)','Latitude','Longitude','Zona ZNT','Klasifikasi Bhumi']
+    const rows = geoData.dataset.features.map((f, i) => {
+      const p = f.properties
+      const h = p?.Harga || 0
+      const zona = classifyPrice(h)
+      const zonaLabel = zona ? `ZNT ${['I','II','III','IV','V'][zona - 1]}` : 'N/A'
+      const klas = h > 20e6 ? '> 20 juta' : h >= 5e6 ? '5-20 juta' : '< 5 juta'
+      const lat = p?.Latitude ?? f.geometry?.coordinates?.[1] ?? ''
+      const lng = p?.Longitude ?? f.geometry?.coordinates?.[0] ?? ''
+      return [i + 1, p?.Kelurahan || '', h, lat, lng, zonaLabel, klas]
+    })
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url; a.download = 'data-harga-tanah-wonokromo.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }, [geoData.dataset])
+
   const loading = !geoData.dataset
 
   const meanBinLabel = useMemo(() => {
@@ -322,14 +378,21 @@ export default function Dashboard() {
                 Kecamatan Wonokromo · {loading ? '…' : `${prices.length} titik data`} · 5 Zona ZNT
               </p>
             </div>
-            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-              {TABS.map(t => (
-                <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                  {t.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-1 flex-wrap">
+                {TABS.map(t => (
+                  <button key={t.id} onClick={() => setTab(t.id)}
+                    className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${
+                      tab === t.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <button onClick={exportCSV}
+                title="Export data harga tanah sebagai CSV"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all flex-shrink-0">
+                <Download size={12} /> CSV
+              </button>
             </div>
           </div>
         </div>
@@ -765,6 +828,152 @@ export default function Dashboard() {
                     AHP Score memiliki rentang sempit (0.596–0.662) — mencerminkan konvergensi pembobotan pakar.
                     LGB Score memiliki rentang lebih lebar (0.062–0.704) — mencerminkan variasi aksesibilitas yang dipelajari model ML.
                   </p>
+                </div>
+
+              </div>
+            )}
+
+            {/* ─── PER KELURAHAN ─── */}
+            {tab === 'kelurahan' && (
+              <div className="space-y-8">
+
+                {/* KPI kelurahan */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {kelurahanData.map(k => (
+                    <div key={k.name} className="bg-white border-2 rounded-xl p-4 hover:shadow-md transition-all"
+                      style={{ borderColor: k.fill + '50' }}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: k.fill }} />
+                        <p className="text-slate-700 text-xs font-bold truncate">{k.name}</p>
+                      </div>
+                      <p className="text-lg font-extrabold tabular-nums" style={{ color: k.fill }}>{fmtJt(k.avg, 1)}</p>
+                      <p className="text-slate-400 text-[10px] mt-0.5">rata-rata · {k.n} sampel</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bar chart rata-rata harga */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Rata-rata Harga Tanah per Kelurahan"
+                    sub="Berdasarkan data titik harga Bhumi yang terklasifikasi ke masing-masing kelurahan"
+                    badge={`n = ${prices.length} titik`} />
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={kelurahanData} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={fmtShort} tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <Tooltip content={({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null
+                        const d = kelurahanData.find(k => k.name === label)
+                        return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-xs shadow-xl">
+                            <p className="font-bold text-slate-800 mb-1.5">{label}</p>
+                            <p className="text-slate-500">Rata-rata: <b className="text-blue-700">{fmtJt(d?.avg ?? 0, 2)}/m²</b></p>
+                            <p className="text-slate-500">Median: <b>{fmtJt(d?.median ?? 0, 2)}/m²</b></p>
+                            <p className="text-slate-500">Sampel: <b>{d?.n}</b></p>
+                          </div>
+                        )
+                      }} />
+                      <Bar dataKey="avg" name="Rata-rata Harga" radius={[4, 4, 0, 0]}>
+                        {kelurahanData.map((k, i) => <Cell key={i} fill={k.fill} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Min-Max range chart */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Rentang Harga Min–Maks per Kelurahan"
+                    sub="Sebaran harga terendah dan tertinggi di setiap kelurahan" />
+                  <div className="space-y-4">
+                    {kelurahanData.map(k => {
+                      const globalMax = Math.max(...kelurahanData.map(d => d.max)) * 1.05
+                      const pct = v => Math.min(100, v / globalMax * 100)
+                      return (
+                        <div key={k.name}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: k.fill }} />
+                              <span className="text-slate-700 text-xs font-semibold">{k.name}</span>
+                              {k.cod !== null && <CODBadge v={k.cod} />}
+                            </div>
+                            <span className="text-slate-400 text-[10px] font-mono">{k.n} sampel · median {fmtJt(k.median, 1)}</span>
+                          </div>
+                          <div className="relative h-7 bg-slate-50 rounded-lg border border-slate-100">
+                            <div className="absolute top-0 bottom-0 rounded-lg border-2 border-white"
+                              style={{ left: `${pct(k.min)}%`, width: `${pct(k.max) - pct(k.min)}%`, background: k.fill, opacity: 0.75 }} />
+                            <div className="absolute top-1.5 bottom-1.5 w-0.5 bg-white/90 rounded-full"
+                              style={{ left: `${pct(k.median)}%` }} />
+                          </div>
+                          <div className="flex justify-between mt-0.5">
+                            <span className="text-[9px] text-slate-400" style={{ marginLeft: `${pct(k.min)}%` }}>{fmtJt(k.min, 1)}</span>
+                            <span className="text-[9px] text-slate-400">{fmtJt(k.max, 1)}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Jumlah sampel per kelurahan */}
+                <div className="bg-white border border-slate-200 rounded-xl p-6">
+                  <SHead title="Jumlah Sampel Data per Kelurahan"
+                    sub="Distribusi 195 titik data harga Bhumi ke 6 kelurahan" />
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={[...kelurahanData].sort((a,b) => b.n - a.n)} margin={{ top: 4, right: 8, bottom: 0, left: -16 }}>
+                      <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} tickLine={false} axisLine={false} />
+                      <Tooltip content={<ChartTip />} />
+                      <Bar dataKey="n" name="Jumlah Sampel" radius={[3, 3, 0, 0]}>
+                        {[...kelurahanData].sort((a,b) => b.n - a.n).map((k, i) => <Cell key={i} fill={k.fill} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Tabel ringkasan kelurahan */}
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100">
+                    <h2 className="text-slate-900 font-semibold text-base">Statistik Deskriptif per Kelurahan</h2>
+                    <p className="text-slate-500 text-xs mt-0.5">Aggregasi dari {prices.length} titik data Bhumi berdasarkan kelurahan</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          {['Kelurahan','N Sampel','Harga Min','Harga Maks','Rata-rata','Median','Std Dev','COD'].map(h => (
+                            <th key={h} className="text-left py-3 px-4 text-slate-500 font-semibold uppercase tracking-wide text-[10px] whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kelurahanData.map(k => (
+                          <tr key={k.name} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: k.fill }} />
+                                <span className="font-semibold text-slate-800">{k.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 font-mono text-slate-700">{k.n}</td>
+                            <td className="py-3 px-4 font-mono text-slate-600">{fmtJt(k.min, 2)}</td>
+                            <td className="py-3 px-4 font-mono text-slate-600">{fmtJt(k.max, 2)}</td>
+                            <td className="py-3 px-4 font-mono font-semibold text-slate-800">{fmtJt(k.avg, 2)}</td>
+                            <td className="py-3 px-4 font-mono text-slate-700">{fmtJt(k.median, 2)}</td>
+                            <td className="py-3 px-4 font-mono text-slate-500">{fmtJt(k.std, 2)}</td>
+                            <td className="py-3 px-4">{k.cod !== null ? <CODBadge v={k.cod} /> : <span className="text-slate-400">–</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="px-6 py-3 bg-slate-50 border-t border-slate-100">
+                    <p className="text-slate-400 text-[10px]">
+                      Wonokromo &amp; Ngagel memiliki harga tertinggi — konsisten dengan lokasi dekat CBD dan aksesibilitas tinggi.
+                      Sawunggaling &amp; Darmo di bawah rata-rata kecamatan, sesuai prediksi model ZNT.
+                    </p>
+                  </div>
                 </div>
 
               </div>

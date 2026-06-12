@@ -43,6 +43,62 @@ const FACILITY_ICONS = {
   ),
 }
 
+/* ─── Symbol renderers per layer type ────────────────── */
+function LayerSymbol({ layer }) {
+  const hasIcon = !!FACILITY_ICONS[layer.id]
+
+  if (hasIcon) return (
+    <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center ring-1 ring-black/10"
+      style={{ background: layer.color }}>
+      {FACILITY_ICONS[layer.id]}
+    </div>
+  )
+
+  if (layer.type === 'line') return (
+    <div className="w-6 flex-shrink-0 flex items-center h-5">
+      <div className="w-full" style={{
+        borderTop: '2.5px solid',
+        borderColor: layer.color
+      }} />
+    </div>
+  )
+
+  if (layer.type === 'polygon') {
+    if (layer.id === 'znt') return (
+      <div className="flex gap-px flex-shrink-0 h-3.5 rounded-sm overflow-hidden ring-1 ring-black/10" style={{ width: 36 }}>
+        {[1,2,3,4,5].map(id => (
+          <div key={id} className="flex-1" style={{ background: ZNT_STYLE[id].fill }} />
+        ))}
+      </div>
+    )
+    if (layer.id === 'lulc') return (
+      <div className="w-5 h-3.5 flex-shrink-0 rounded-sm ring-1 ring-black/10 overflow-hidden">
+        <div className="w-full h-full" style={{
+          background: 'linear-gradient(90deg, #f97316 0%, #22c55e 40%, #3b82f6 65%, #ef4444 100%)'
+        }} />
+      </div>
+    )
+    return (
+      <div className="w-5 h-3.5 rounded-sm flex-shrink-0 border-2"
+        style={{ background: layer.color + '55', borderColor: layer.color }} />
+    )
+  }
+
+  // point — dataset: show 3 price-class dots; others: single dot
+  if (layer.id === 'dataset') return (
+    <div className="flex gap-0.5 flex-shrink-0 items-center h-5">
+      <div className="w-2 h-2 rounded-full" style={{ background: '#059669' }} />
+      <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#2563eb' }} />
+      <div className="w-2 h-2 rounded-full" style={{ background: '#dc2626' }} />
+    </div>
+  )
+
+  return (
+    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-black/10"
+      style={{ background: layer.color }} />
+  )
+}
+
 /* ─── Tab ────────────────────────────────────────────── */
 function Tab({ active, onClick, children }) {
   return (
@@ -58,16 +114,10 @@ function Tab({ active, onClick, children }) {
 /* ─── Layer item ─────────────────────────────────────── */
 function LayerItem({ layer, visible, onToggle, opacity, onSetOpacity, activeBuffers, onToggleBuffer, language }) {
   const label = language === 'en' ? layer.labelEn : layer.label
-  const hasIcon = !!FACILITY_ICONS[layer.id]
   return (
     <div className="rounded-lg hover:bg-slate-50 transition-colors px-2 py-2">
       <div className="flex items-center gap-2">
-        {hasIcon
-          ? <div className="w-4.5 h-4.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center ring-1 ring-black/10" style={{ background: layer.color }}>
-              {FACILITY_ICONS[layer.id]}
-            </div>
-          : <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-black/10" style={{ background: layer.color }} />
-        }
+        <LayerSymbol layer={layer} />
         <span className={`flex-1 text-xs leading-tight min-w-0 truncate ${
           visible ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
         <button onClick={onToggle}
@@ -76,7 +126,7 @@ function LayerItem({ layer, visible, onToggle, opacity, onSetOpacity, activeBuff
         </button>
       </div>
       {visible && (
-        <div className="flex items-center gap-2 mt-1.5 ml-4.5 pl-0.5">
+        <div className="flex items-center gap-2 mt-1.5 ml-7 pl-0.5">
           <SlidersHorizontal size={9} className="text-slate-300 flex-shrink-0" />
           <input type="range" min="0.1" max="1" step="0.05"
             value={opacity ?? 0.78}
@@ -86,7 +136,7 @@ function LayerItem({ layer, visible, onToggle, opacity, onSetOpacity, activeBuff
         </div>
       )}
       {layer.buffer && visible && (
-        <div className="flex gap-1 mt-1.5 ml-4.5">
+        <div className="flex gap-1 mt-1.5 ml-7">
           {BUFFER_DISTANCES.map(dist => {
             const key = `${layer.id}_${dist}`
             const isOn = !!activeBuffers?.[key]
@@ -106,28 +156,37 @@ function LayerItem({ layer, visible, onToggle, opacity, onSetOpacity, activeBuff
 }
 
 /* ─── Legend swatch ─────────────────────────────────── */
-function Swatch({ color, label, line }) {
+function Swatch({ color, label, line, dashed }) {
   return (
     <div className="flex items-center gap-2.5">
       {line
-        ? <div className="w-5 h-0 border-t-2 flex-shrink-0" style={{ borderColor: color, borderStyle: 'dashed' }} />
+        ? <div className="w-6 flex-shrink-0 flex items-center">
+            <div className="w-full" style={{
+              borderTop: '2.5px solid',
+              borderColor: color,
+              borderStyle: dashed ? 'dashed' : 'solid'
+            }} />
+          </div>
         : <div className="w-4 h-3 rounded flex-shrink-0 border border-black/10" style={{ background: color }} />}
       <span className="text-[11px] text-slate-500 leading-tight">{label}</span>
     </div>
   )
 }
-function Dot({ color, label }) {
+
+function Dot({ color, label, size = 3 }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="w-3 h-3 rounded-full flex-shrink-0 border-2 border-white shadow-sm" style={{ background: color }} />
+      <div className="rounded-full flex-shrink-0 border-2 border-white shadow-sm"
+        style={{ width: size * 4, height: size * 4, background: color }} />
       <span className="text-[11px] text-slate-500">{label}</span>
     </div>
   )
 }
+
 function FacilityDot({ layerId, color, label }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-white shadow-sm flex-shrink-0"
+      <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center border-2 border-white shadow-sm"
         style={{ background: color }}>
         {FACILITY_ICONS[layerId]}
       </div>
@@ -137,11 +196,11 @@ function FacilityDot({ layerId, color, label }) {
 }
 
 /* ─── Toggle ─────────────────────────────────────────── */
-function Toggle({ on, onClick, label }) {
+function Toggle({ on, onClick }) {
   return (
     <button onClick={onClick}
       className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ${on ? 'bg-blue-600' : 'bg-slate-200'}`}>
-      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-4.5' : 'translate-x-0.5'}`}
+      <span className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform"
         style={{ transform: on ? 'translateX(17px)' : 'translateX(2px)' }} />
     </button>
   )
@@ -254,14 +313,12 @@ export default function SidePanel({
                   <Filter size={12} className="text-violet-500" />
                   <span className="text-xs font-semibold text-slate-700">Filter Data</span>
                 </div>
-                {/* Search */}
                 <div className="relative mb-2">
                   <Search size={9} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300" />
                   <input type="text" placeholder="Cari alamat…"
                     value={filterSearch} onChange={e => onSetFilterSearch(e.target.value)}
                     className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg bg-white border border-slate-200 text-slate-700 placeholder-slate-300 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100" />
                 </div>
-                {/* Class */}
                 <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Kelas Harga:</p>
                 <div className="flex flex-wrap gap-1 mb-2.5">
                   {[
@@ -272,16 +329,13 @@ export default function SidePanel({
                   ].map(({ value, label, color }) => (
                     <button key={value} onClick={() => onSetFilterClass(value)}
                       className={`px-2.5 py-1 rounded-lg text-[10px] font-medium border transition-all ${
-                        filterClass === value
-                          ? 'text-white border-transparent'
-                          : 'text-slate-500 bg-white border-slate-200 hover:border-slate-400'
+                        filterClass === value ? 'text-white border-transparent' : 'text-slate-500 bg-white border-slate-200 hover:border-slate-400'
                       }`}
                       style={filterClass === value ? { background: color } : {}}>
                       {label}
                     </button>
                   ))}
                 </div>
-                {/* Desa */}
                 <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 mb-1.5">Kelurahan:</p>
                 <select value={filterDesa} onChange={e => onSetFilterDesa(e.target.value)}
                   className="w-full text-xs rounded-lg bg-white border border-slate-200 text-slate-700 px-2 py-1.5 focus:outline-none focus:border-blue-400">
@@ -300,6 +354,8 @@ export default function SidePanel({
           {/* ── LEGEND ── */}
           {tab === 'legend' && (
             <div className="space-y-4 pt-1 pb-2">
+
+              {/* ZNT choropleth */}
               {visibleLayers.znt && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">{t.zntLabel}</p>
@@ -310,16 +366,26 @@ export default function SidePanel({
                   </div>
                 </div>
               )}
+
+              {/* Batas Kelurahan */}
               {visibleLayers.desa && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">{t.desaColors}</p>
                   <div className="space-y-1.5">
-                    {[['#dbeafe','< 10.000'],['#93c5fd','10.000–15.000'],['#60a5fa','15.000–20.000'],['#3b82f6','20.000–30.000'],['#1d4ed8','> 30.000']].map(([c,l]) => (
+                    {[
+                      ['#dbeafe','< 10.000 jiwa/km²'],
+                      ['#93c5fd','10.000–15.000'],
+                      ['#60a5fa','15.000–20.000'],
+                      ['#3b82f6','20.000–30.000'],
+                      ['#1d4ed8','> 30.000']
+                    ].map(([c,l]) => (
                       <Swatch key={l} color={c} label={l} />
                     ))}
                   </div>
                 </div>
               )}
+
+              {/* LULC */}
               {visibleLayers.lulc && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Penggunaan Lahan</p>
@@ -330,17 +396,31 @@ export default function SidePanel({
                   </div>
                 </div>
               )}
+
+              {/* Jaringan (Jalan + Sungai) */}
+              {(visibleLayers.jalan || visibleLayers.sungai) && (
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Jaringan</p>
+                  <div className="space-y-1.5">
+                    {visibleLayers.jalan && <Swatch color="#dc2626" label="Jalan Kolektor" line />}
+                    {visibleLayers.sungai && <Swatch color="#0369a1" label="Sungai" line />}
+                  </div>
+                </div>
+              )}
+
+              {/* Data Harga Tanah */}
               {visibleLayers.dataset && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">{t.dataHarga}</p>
                   <div className="space-y-1.5">
                     <Dot color="#059669" label="< Rp 5 juta/m²" />
-                    <Dot color="#2563eb" label="Rp 5–20 juta/m²" />
+                    <Dot color="#2563eb" label="Rp 5–20 juta/m²" size={3.5} />
                     <Dot color="#dc2626" label="> Rp 20 juta/m²" />
                   </div>
                 </div>
               )}
-              {/* ── Fasilitas (icon-based) ── */}
+
+              {/* Fasilitas (icon-based) */}
               {(visibleLayers.faskes || visibleLayers.pendidikan || visibleLayers.cbd || visibleLayers.pasar || visibleLayers.transportasi) && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Fasilitas</p>
@@ -353,6 +433,8 @@ export default function SidePanel({
                   </div>
                 </div>
               )}
+
+              {/* Overlay aktif */}
               {(heatmapOn || bubblesOn) && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Overlay Aktif</p>
@@ -365,14 +447,17 @@ export default function SidePanel({
                   {bubblesOn && <Dot color="#2563eb" label="Bubble Chart (ukuran = harga)" />}
                 </div>
               )}
+
+              {/* Buffer */}
               {Object.values(activeBuffers).some(Boolean) && (
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">{t.bufferLabel}</p>
                   <div className="space-y-1.5">
-                    {BUFFER_DISTANCES.map(d => <Swatch key={d} color={BUFFER_COLORS[d].fill} label={`Buffer ${d} m`} line />)}
+                    {BUFFER_DISTANCES.map(d => <Swatch key={d} color={BUFFER_COLORS[d].fill} label={`Buffer ${d} m`} line dashed />)}
                   </div>
                 </div>
               )}
+
             </div>
           )}
         </div>

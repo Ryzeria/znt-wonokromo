@@ -241,10 +241,17 @@ function MapFlyer({ center, zoom }) {
   return null
 }
 
-function StoryMap_Map({ chapter, geoData }) {
+function StoryMap_Map({ chapter, geoData, simulationOn }) {
   const dotIcon = (color, size = 7) => L.divIcon({
     html: `<div style="width:${size*2}px;height:${size*2}px;background:${color};border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
     className: '', iconAnchor: [size, size]
+  })
+
+  const newFaskesIcon = L.divIcon({
+    html: `<div style="width:28px;height:28px;background:#16a34a;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;">
+      <svg width="14" height="14" viewBox="0 0 12 12" fill="white"><rect x="4.5" y="0" width="3" height="12" rx="1"/><rect x="0" y="4.5" width="12" height="3" rx="1"/></svg>
+    </div>`,
+    className: '', iconAnchor: [14, 14]
   })
 
   return (
@@ -295,6 +302,28 @@ function StoryMap_Map({ chapter, geoData }) {
           <GeoJSON key={`cbd-${chapter.id}`} data={geoData.cbd}
             pointToLayer={(_, ll) => L.marker(ll, { icon: facilityMarker('cbd', '#7c3aed', 24) })} />
         )}
+        {/* ── Simulation overlay (chapter 04 only) ── */}
+        {chapter.id === 'simulation' && simulationOn && (
+          <>
+            {/* Impact zone polygon */}
+            <GeoJSON key="impact-zone" data={IMPACT_ZONE}
+              style={{ fillColor: '#16a34a', color: '#15803d', weight: 2, fillOpacity: 0.12, opacity: 0.8, dashArray: '8 4' }} />
+            {/* Proposed new road */}
+            <GeoJSON key="proposed-road" data={PROPOSED_ROAD}
+              style={{ color: '#f59e0b', weight: 4, opacity: 0.95, dashArray: '10 5' }} />
+            {/* New faskes marker */}
+            <GeoJSON
+              key="new-faskes"
+              data={{ type: 'FeatureCollection', features: [{
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [NEW_FASKES_PT.lng, NEW_FASKES_PT.lat] },
+                properties: {}
+              }]}}
+              pointToLayer={(_, ll) => L.marker(ll, { icon: newFaskesIcon })}
+            />
+          </>
+        )}
+
         <MapFlyer center={chapter.center} zoom={chapter.zoom} />
       </MapContainer>
 
@@ -322,8 +351,42 @@ function StoryMap_Map({ chapter, geoData }) {
   )
 }
 
+/* ─── Proposed infrastructure GeoJSON (hardcoded simulation) ─── */
+const PROPOSED_ROAD = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    geometry: {
+      type: 'LineString',
+      coordinates: [
+        [112.716, -7.293],[112.721, -7.290],[112.728, -7.289],
+        [112.736, -7.290],[112.744, -7.292],[112.749, -7.295],
+      ]
+    },
+    properties: { name: 'Rencana Jalan Kolektor Baru' }
+  }]
+}
+
+const IMPACT_ZONE = {
+  type: 'FeatureCollection',
+  features: [{
+    type: 'Feature',
+    geometry: {
+      type: 'Polygon',
+      coordinates: [[
+        [112.714, -7.287],[112.752, -7.287],[112.752, -7.302],
+        [112.714, -7.302],[112.714, -7.287],
+      ]]
+    },
+    properties: { name: 'Zona Terdampak' }
+  }]
+}
+
+const NEW_FASKES_PT = { lat: -7.292, lng: 112.733 }
+
 export default function StoryMap() {
   const [active, setActive] = useState(0)
+  const [simulationOn, setSimulationOn] = useState(false)
   const refs = useRef([])
   const geoData = useGeoData(['znt', 'desa', 'dataset', 'jalan', 'faskes', 'cbd', 'sungai'])
 
@@ -349,6 +412,11 @@ export default function StoryMap() {
 
   const chapter = CHAPTERS[active]
 
+  /* Reset simulation when leaving chapter 04 */
+  useEffect(() => {
+    if (active !== 3) setSimulationOn(false)
+  }, [active])
+
   return (
     <div className="bg-white">
       <NavBar />
@@ -357,7 +425,7 @@ export default function StoryMap() {
         {/* Sticky map — left (desktop) */}
         <div className="hidden lg:block lg:w-[55%] relative">
           <div className="sticky top-14" style={{ height: 'calc(100vh - 3.5rem)' }}>
-            <StoryMap_Map chapter={chapter} geoData={geoData} />
+            <StoryMap_Map chapter={chapter} geoData={geoData} simulationOn={simulationOn} />
           </div>
         </div>
 
@@ -422,6 +490,101 @@ export default function StoryMap() {
               </div>
 
               <p className="text-slate-600 text-sm leading-relaxed mb-5">{ch.body}</p>
+
+              {/* ── Simulation toggle (chapter 04 only) ── */}
+              {ch.id === 'simulation' && (
+                <div className="mb-5">
+                  {/* Toggle */}
+                  <div className="flex rounded-xl overflow-hidden border border-slate-200 mb-4">
+                    <button onClick={() => setSimulationOn(false)}
+                      className={`flex-1 py-2.5 text-xs font-semibold transition-all ${!simulationOn ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                      📍 Kondisi Saat Ini
+                    </button>
+                    <button onClick={() => setSimulationOn(true)}
+                      className={`flex-1 py-2.5 text-xs font-semibold transition-all ${simulationOn ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                      🏗️ Setelah Pengembangan
+                    </button>
+                  </div>
+
+                  {/* Before/After comparison */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    {/* Before */}
+                    <div className={`rounded-xl border p-3 transition-all ${!simulationOn ? 'border-slate-300 bg-slate-50' : 'border-slate-100 opacity-60'}`}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-2">Kondisi Saat Ini</p>
+                      <div className="space-y-1.5">
+                        {[
+                          { l: 'Dominan Zona', v: 'ZNT I–II' },
+                          { l: 'Rata-rata Skor', v: '0.245' },
+                          { l: 'NT Area Utara', v: '~Rp 5.8 jt/m²' },
+                          { l: 'Aksesibilitas', v: 'Terbatas' },
+                        ].map(({ l, v }) => (
+                          <div key={l} className="flex justify-between text-[10px]">
+                            <span className="text-slate-500">{l}</span>
+                            <span className="font-semibold text-slate-700">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* After */}
+                    <div className={`rounded-xl border p-3 transition-all ${simulationOn ? 'border-emerald-300 bg-emerald-50' : 'border-slate-100 opacity-60'}`}>
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-500 mb-2">Setelah Pengembangan</p>
+                      <div className="space-y-1.5">
+                        {[
+                          { l: 'Proyeksi Zona', v: 'ZNT II–III' },
+                          { l: 'Rata-rata Skor', v: '0.287 (+17%)' },
+                          { l: 'NT Proyeksi', v: '~Rp 7.2 jt/m²' },
+                          { l: 'Aksesibilitas', v: 'Meningkat' },
+                        ].map(({ l, v }) => (
+                          <div key={l} className="flex justify-between text-[10px]">
+                            <span className="text-slate-500">{l}</span>
+                            <span className="font-semibold text-emerald-700">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Infrastructure legend for after state */}
+                  {simulationOn && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-emerald-600 mb-2">Infrastruktur Baru (Peta)</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 flex-shrink-0 flex items-center">
+                          <div className="w-full border-t-2 border-dashed border-amber-500" />
+                        </div>
+                        <span className="text-[10px] text-slate-600">Rencana Jalan Kolektor Baru (~1.2 km)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-5 rounded-full flex-shrink-0 bg-emerald-600 border-2 border-white flex items-center justify-center shadow-sm">
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="white"><rect x="4.5" y="0" width="3" height="12" rx="1"/><rect x="0" y="4.5" width="12" height="3" rx="1"/></svg>
+                        </div>
+                        <span className="text-[10px] text-slate-600">Faskes Baru (Klinik Pratama)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-5 h-3 rounded flex-shrink-0" style={{ background: '#16a34a', opacity: 0.25, border: '1.5px dashed #15803d' }} />
+                        <span className="text-[10px] text-slate-600">Zona terdampak (±320 ha, radius 300m)</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Key insights */}
+                  <div className="mt-3 bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <p className="text-[10px] font-bold text-blue-700 mb-1.5">Temuan Simulasi</p>
+                    <ul className="space-y-0.5">
+                      {[
+                        '+12–18% kenaikan skor ZNT di radius 300m jalan baru',
+                        '+5–8% dampak penambahan faskes baru terhadap skor',
+                        '±320 ha wilayah terdampak positif (ZNT I→II, II→III)',
+                        'Estimasi kenaikan NT: Rp 1.4–2.6 jt/m² dalam 3–5 tahun',
+                      ].map((item, i) => (
+                        <li key={i} className="text-[10px] text-blue-700 flex items-start gap-1.5">
+                          <span className="text-blue-400 flex-shrink-0 mt-0.5">▸</span>{item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
 
               {/* AHP weights (chapter 2) */}
               {ch.ahpWeights && (
